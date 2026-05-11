@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="es">
+<head>
+<script>
+(function(){
+  var ua = navigator.userAgent || '';
+  var mobileUA = /Mobile|Android|iPhone|iPad|webOS|BlackBerry/i.test(ua);
+  var touchScreen = navigator.maxTouchPoints > 0;
+  var smallScreen = screen.width < 1024;
+  if(mobileUA || (touchScreen && smallScreen)){
+    document.open();
+    document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Chi.Bio Nexus</title><style>body{margin:0;background:#0b0e14;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;}.box{text-align:center;color:#e2e8f0;padding:40px;}h1{color:#00d68f;font-size:22px;margin-bottom:12px;}p{color:#94a3b8;font-size:14px;max-width:320px;line-height:1.6;}.icon{font-size:40px;margin-bottom:16px;}</style></head><body><div class="box"><div class="icon">&#x1F52C;</div><h1>Chi.Bio Nexus</h1><p>Esta plataforma requiere un navegador de escritorio.<br><br>El acceso desde dispositivos m&#xF3;viles no est&#xE1; habilitado por razones de seguridad operacional.</p></div></body></html>');
+    document.close();
+  }
+})();
+</script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
+  <title>Chi.Bio Nexus</title>
+  <meta http-equiv="cache-control" content="no-cache">
+  <meta http-equiv="expires" content="0">
+  <meta http-equiv="pragma" content="no-cache">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script type="text/javascript" src="{{ url_for('static', filename='HTMLScripts.js') }}"></script>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script>google.charts.load('current',{packages:['corechart','line']});</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script>
+    (function(){
+      var th = localStorage.getItem('chibio-theme') || 'dark';
+      if(th === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    })();
+  </script>
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
+</head>
+<body onload="getSysData()">
+
+<!-- TOPBAR NEXUS -->
+<div id="topbar">
+  <a class="logo" href="#">
+    <div class="logo-icon"><i class="fa-solid fa-flask-vial"></i></div>
+    <div><div class="logo-l1">Chi.<span>Bio</span></div><div class="logo-l2">NEXUS &nbsp; v1.0</div></div>
+  </a>
+
+  <!-- Tabs de navegación principal -->
+  <div class="nexus-tabs" id="nexus-tab-bar">
+    <button class="nexus-tab active" id="ntab-main"      onclick="switchNexusTab('main')"     ><i class="fa-solid fa-chart-line"></i> Main</button>
+    <button class="nexus-tab"        id="ntab-architect" onclick="switchNexusTab('architect')"><i class="fa-solid fa-layer-group"></i> Architect</button>
+    <button class="nexus-tab"        id="ntab-camera"    onclick="switchNexusTab('camera')"   ><i class="fa-solid fa-video"></i> Cámara</button>
+  </div>
+
+  <!-- ── Controles contextuales del MAIN ── -->
+  <div id="ctx-main" style="display:flex;align-items:center;gap:9px;flex:1;">
+    <div class="tb-sep"></div>
+    <div class="dev-row" id="main-dev-row">
+      <button class="dev-btn" id="Device0" onclick="changeDevice('M0')">M0</button>
+      <button class="dev-btn" id="Device1" onclick="changeDevice('M1')">M1</button>
+      <button class="dev-btn" id="Device2" onclick="changeDevice('M2')">M2</button>
+      <button class="dev-btn" id="Device3" onclick="changeDevice('M3')">M3</button>
+      <button class="dev-btn" id="Device4" onclick="changeDevice('M4')">M4</button>
+      <button class="dev-btn" id="Device5" onclick="changeDevice('M5')">M5</button>
+      <button class="dev-btn" id="Device6" onclick="changeDevice('M6')">M6</button>
+      <button class="dev-btn" id="Device7" onclick="changeDevice('M7')">M7</button>
+    </div>
+    <button class="btn btn-scan" id="main-scan-btn" onclick="doScanDevices()"><i class="fa-solid fa-satellite-dish"></i> Escanear</button>
+    <div class="tb-sep"></div>
+    <div class="spill mobile-hidden" id="exp-pill"><div class="sdot"></div><span id="exp-pill-text">Detenido</span></div>
+    <span class="tb-text" id="StartTime">—</span>
+    <span class="tb-text" id="cyc">Ciclo —</span>
+    <div class="cpill" id="cloud-pill">
+      <i class="fa-solid fa-cloud cloud-ico" id="cloud-ico" style="font-size:10px"></i>
+      <span id="cloud-pill-text">Cloud</span>
+    </div>
+    <div id="main-action-btns" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <button class="btn btn-go"    id="ExperimentStart" onclick="startExperiment()"><i class="fa-solid fa-play"></i> Iniciar</button>
+      <button class="btn btn-stop"  id="ExperimentStop"  onclick="stopExperiment()"><i class="fa-solid fa-stop"></i> Detener</button>
+      <button class="btn btn-ghost" id="ExperimentReset" onclick="resetExperiment()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+    </div>
+  </div>
+
+  <!-- ── Controles contextuales del ARCHITECT ── -->
+  <div id="ctx-architect" style="display:none;align-items:center;gap:6px;flex:1;">
+    <div class="tb-sep"></div>
+    <button id="arch-caudales-btn" class="btn btn-ghost" onclick="archCmd('openPumpModal')" style="font-size:11px;padding:4px 10px;">
+      <i class="fa-solid fa-faucet-drip" style="color:#3b82f6"></i> Caudales
+    </button>
+    <div class="tb-sep"></div>
+    
+    <div id="arch-reactor-group" style="display:flex;align-items:center;gap:6px;">
+      <span class="tb-text" style="font-size:11px; font-family:var(--f-ui); font-weight:700;">Reactor:</span>
+      <select id="arch-reactor" class="field fsm" style="width:52px; font-size:11px; font-family:var(--f-ui); font-weight:700; padding:3px 5px;" onchange="archCmd('setReactor', this.value)">
+        <option>M0</option><option selected>M1</option><option>M2</option><option>M3</option>
+        <option>M4</option><option>M5</option><option>M6</option><option>M7</option>
+      </select>
+      <span class="tb-text" style="font-size:11px; font-family:var(--f-ui); font-weight:700;">Destino:</span>
+      <select id="arch-destino" class="field fsm" style="width:80px; font-size:11px; font-family:var(--f-ui); font-weight:700; padding:3px 5px;" onchange="archCmd('setDestino', this.value)">
+        <option value="C1">C1</option><option value="C2">C2</option><option value="C3">C3</option>
+        <option value="C4">C4</option><option value="C5">C5</option><option value="C6">C6</option>
+        <option value="C7">C7</option><option value="C8" selected>C8</option>
+      </select>
+    </div>
+
+    <div class="tb-sep"></div>
+    <div id="arch-safety-badge" class="spill arch-safety" style="cursor:pointer;font-size:10px;padding:4px 10px;" onclick="archCmd('openSafety')">
+      <div class="sdot"></div><span id="arch-safety-text"><i class="fa-solid fa-lock" style="font-size:9px;margin-right:2px"></i>Seguridad</span>
+    </div>
+
+    <div id="arch-export-group" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
+      <div id="arch-export-btns" style="display:flex;align-items:center;gap:4px;">
+        <button class="btn btn-ghost" onclick="archCmd('export')" style="padding:5px 9px;"><i class="fa-solid fa-file-export" style="color:#10b981"></i> Exportar</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('arch-import-file').click()" style="padding:5px 9px;"><i class="fa-solid fa-file-import" style="color:#60a5fa"></i> Importar</button>
+        <input type="file" id="arch-import-file" accept=".chibio,.json" style="display:none" onchange="handleArchImport(event)">
+      </div>
+      <div class="tb-sep"></div>
+      <button id="arch-tour-btn" class="btn btn-ghost" onclick="archCmd('tour')" style="padding:5px 9px;"><i class="fa-solid fa-circle-question" style="color:#f59e0b"></i> Tour</button>
+      <div class="tb-sep"></div>
+      <div id="arch-hist-btns" style="display:flex;align-items:center;gap:4px;">
+        <button class="btn btn-ghost" onclick="archCmd('undo')" style="padding:5px 9px;" title="Deshacer"><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="btn btn-ghost" onclick="archCmd('redo')" style="padding:5px 9px;" title="Rehacer"><i class="fa-solid fa-rotate-right"></i></button>
+        <button class="btn btn-ghost" onclick="archCmd('clearCanvas')" style="padding:5px 9px;" title="Limpiar"><i class="fa-solid fa-trash-can"></i></button>
+      </div>
+      <div id="arch-compile-btns" style="display:flex;align-items:center;gap:4px;">
+        <button class="btn btn-arch-accent" onclick="archCmd('doCompile')"><i class="fa-solid fa-bolt"></i> Compilar FSM</button>
+        <button class="btn btn-arch-cloud" id="arch-send-btn" disabled onclick="archCmd('sendToReactor')"><i class="fa-solid fa-paper-plane"></i> Enviar a Biorreactor</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Spill móvil -->
+  <div class="spill desktop-hidden" id="exp-pill-mob"><div class="sdot"></div><span id="exp-pill-text-mob">Detenido</span></div>
+  <button class="mob-menu-btn" id="mob-menu-btn" onclick="toggleMobMenu()"><i class="fa-solid fa-bars"></i></button>
+
+<!-- Botones globales siempre visibles -->
+  <div id="global-buttons" style="display:flex; align-items:center; gap:9px;">
+    <div class="tb-sep"></div>
+    <button class="btn btn-ghost" id="themeToggleBtn" onclick="toggleTheme()" title="Modo Claro/Oscuro" style="padding:5px 9px"><i class="fa-solid fa-moon"></i></button>
+    <button class="btn btn-ghost" onclick="startMainTour()" title="Tour guiado" style="padding:5px 9px"><i class="fa-solid fa-circle-question" style="color:#f59e0b"></i></button>
+  </div>
+
+<!-- NEXUS: Panel Main -->
+<div id="nexus-main">
+
+<!-- PAGE -->
+<div id="page">
+
+<!-- ══════════════ COLUMNA IZQUIERDA ══════════════════════ -->
+<div class="col-l">
+  <div class="tab-container mob-active" id="tab-setup">
+
+  <!-- DENSIDAD ÓPTICA -->
+  <div class="card c-gr">
+    <div class="ch">
+      <div class="ch-ico" style="background:var(--gr-d);color:var(--gr)"><i class="fa-solid fa-bullseye"></i></div>
+      <span class="ch-ttl">Densidad Óptica</span>
+      <span id="TName" style="font-family:var(--f-mono);font-size:10px;color:var(--tx3)">M0</span>
+    </div>
+    <div class="cb">
+      <!-- OD grande + meta boxes — FIX: min-width:0 en flex children -->
+      <!-- OD grande arriba, Target y Vol en fila separada con más espacio -->
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        <div>
+          <div style="font-size:9px;font-weight:700;color:var(--tx3);margin-bottom:1px">ACTUAL</div>
+          <div class="od-big" id="ODCurrent">0.000</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div class="mbox"><div class="mlbl">Target OD</div><div class="mval" id="ODTarget">0.000</div></div>
+          <div class="mbox"><div class="mlbl">Volumen ml</div><div class="mval"><span id="VolumeCurrent">20</span></div></div>
+        </div>
+      </div>
+
+      <!-- FIX: num-field con padding-right para no tapar valor con spinner -->
+      <div class="row">
+        <span class="lbl" style="min-width:62px">Nuevo OD</span>
+        <input id="ODInput" type="number" class="num-field" step="0.01">
+        <button class="ib ib-gr ib-sm" id="ODSet" onclick="setOD()">Set</button>
+        <button class="ib ib-sm" id="ODMeasure" onclick="measureOD()"><i class="fa-solid fa-flask"></i></button>
+      </div>
+      <div class="row">
+        <span class="lbl" style="min-width:62px">Vol. ml</span>
+        <input id="VolumeInput" type="number" class="num-field">
+        <button class="ib ib-sm" onclick="setVolume()">Set</button>
+      </div>
+      <div class="sec">Modo de control</div>
+      <button class="mb" id="ODRegulate" onclick="toggleODRegulate()"><i class="fa-solid fa-chart-line"></i> Turbidostato</button>
+      <button class="mb" id="Zigzag" onclick="toggleZigzag()"><i class="fa-solid fa-wave-square"></i> Zigzag / μ</button>
+    </div>
+  </div>
+
+  <!-- CALIBRACIÓN ÓPTICA — COLAPSABLE -->
+  <div class="card c-cy">
+    <div class="ch">
+      <div class="ch-ico" style="background:var(--cy-d);color:var(--cy)"><i class="fa-solid fa-sliders"></i></div>
+      <span class="ch-ttl">Calibración Óptica</span>
+      <!-- Botón expandir/colapsar -->
+      <button class="cal-toggle" id="cal-toggle-btn" onclick="toggleCal()" title="Expandir/Colapsar">
+        <i class="fa-solid fa-chevron-right"></i>
+        <span id="cal-toggle-label" style="font-size:10px">Ver</span>
+      </button>
+    </div>
+    <!-- Resumen siempre visible -->
+    <div style="display:flex;gap:5px;padding:6px 11px;border-bottom:1px solid var(--bd);">
+      <div class="mbox" style="flex:1"><div class="mlbl">OD Zero</div><div class="mval" id="OD0Current">—</div></div>
+      <div class="mbox" style="flex:1"><div class="mlbl">Raw</div><div class="mval" id="ODRawVal">—</div></div>
+    </div>
+    <!-- Cuerpo colapsable -->
+    <div class="cal-body collapsed" id="cal-body">
+      <div style="padding:10px 11px;display:flex;flex-direction:column;gap:7px;">
+        <p style="font-size:11px;color:var(--tx3);line-height:1.5;">Introduce el <strong style="color:var(--tx2)">Raw medido</strong> y el <strong style="color:var(--tx2)">OD real</strong> (espectrofotómetro externo).</p>
+        <div class="row"><span class="lbl" style="min-width:70px">Raw medido</span><input id="OD0Input" type="number" class="num-field"></div>
+        <div class="row"><span class="lbl" style="min-width:70px">OD real</span><input id="OD0Actual" type="number" class="num-field"></div>
+        <button class="mb" id="OD0Set" onclick="calibrateOD()"><i class="fa-solid fa-crosshairs"></i> Calibrar OD Zero</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TEMPERATURA -->
+  <div class="card c-rd">
+    <div class="ch"><div class="ch-ico" style="background:var(--rd-d);color:var(--rd)"><i class="fa-solid fa-temperature-half"></i></div><span class="ch-ttl">Temperatura</span></div>
+    <div class="cb">
+      <div class="temp-g">
+        <div class="ttile" onclick="measureTemp('External')"><div class="val" id="TempCurrent">—</div><div class="sub">EXT</div></div>
+        <div class="ttile" onclick="measureTemp('Internal')"><div class="val" id="TempCurrent2">—</div><div class="sub">INT</div></div>
+        <div class="ttile hot" onclick="measureTemp('IR')"><div class="val" id="TempCurrent3">—</div><div class="sub">IR LÍQ</div></div>
+      </div>
+      <!-- FIX: num-field para que spinner no tape el valor -->
+      <div class="row">
+        <span class="lbl" style="min-width:62px">Target °C</span>
+        <span style="font-family:var(--f-mono);font-size:11px;font-weight:700;color:var(--rd);flex-shrink:0;min-width:30px" id="ThermostatTarget">37°</span>
+        <input id="ThermostatInput" type="number" class="num-field">
+        <button class="ib ib-sm" onclick="setThermostat()">Set</button>
+      </div>
+      <button class="mb" id="ThermostatSwitch" onclick="toggleThermostat()"><i class="fa-solid fa-fire"></i> Termostato</button>
+    </div>
+  </div>
+
+  <!-- AGITACIÓN -->
+  <div class="card c-am">
+    <div class="ch"><div class="ch-ico" style="background:var(--am-d);color:var(--am)"><i class="fa-solid fa-fan"></i></div><span class="ch-ttl">Agitación</span></div>
+    <div class="cb">
+      <!-- Orb centrada + valor actual grande debajo -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="sorb" id="stir-orb"><i class="fa-solid fa-hurricane"></i></div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div style="font-size:9px;font-weight:700;color:var(--tx3)">VELOCIDAD ACTUAL</div>
+          <div style="font-family:var(--f-mono);font-size:20px;font-weight:600;color:var(--am);line-height:1" id="StirCurrent">—</div>
+        </div>
+      </div>
+      <!-- Input y Set en su propia fila limpia -->
+      <div class="row" style="gap:7px;">
+        <span class="lbl" style="min-width:68px;font-size:11px;">Nueva vel.</span>
+        <input id="StirInput" type="number" class="num-field" step="0.1" min="0" max="1" style="flex:1">
+        <button class="ib ib-sm" onclick="setStir()">Set</button>
+      </div>
+      <button class="mb" id="StirSwitch" onclick="toggleStir()"><i class="fa-solid fa-fan"></i> Agitador</button>
+    </div>
+  </div>
+
+  </div> <!-- /tab-container #tab-setup -->
+</div><!-- /col-l -->
+
+<!-- ══════════════ COLUMNA CENTRAL ════════════════════════ -->
+<div class="col-c">
+  <div class="tab-container" id="tab-charts">
+
+  <!-- BARRA DE CONTROL DE GRÁFICAS -->
+  <div id="chart-toggles-bar" style="display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;">
+    <span style="font-family:var(--f-mono);font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.5px;">Gráficas</span>
+    <button id="cht-btn-od"    class="cht-tog on"  onclick="toggleChart('od')"   ><i class="fa-solid fa-chart-line"></i> OD</button>
+    <button id="cht-btn-mu"    class="cht-tog on"  onclick="toggleChart('mu')"   ><i class="fa-solid fa-dna"></i> μ</button>
+    <button id="cht-btn-temp"  class="cht-tog on"  onclick="toggleChart('temp')" ><i class="fa-solid fa-temperature-half"></i> Temp</button>
+    <button id="cht-btn-pumps" class="cht-tog on"  onclick="toggleChart('pumps')"><i class="fa-solid fa-droplet"></i> Bombas</button>
+    <span style="flex:1"></span>
+    <button class="btn-csv" onclick="exportToCSV()" title="Descargar datos en formato CSV"><i class="fa-solid fa-file-csv"></i> CSV</button>
+
+  </div>
+
+  <!-- GRÁFICAS DINÁMICAS -->
+  <div class="charts4" id="charts4">
+    <div class="cbox" id="cbox-od">
+      <div class="cbox-t"><i class="fa-solid fa-chart-line" style="color:var(--gr)"></i> Densidad Óptica</div>
+      <div id="chart_div2"></div>
+    </div>
+    <div class="cbox" id="cbox-mu">
+      <div class="cbox-t"><i class="fa-solid fa-dna" style="color:var(--pu)"></i> Tasa Crecimiento μ</div>
+      <div id="chart_div3"></div>
+    </div>
+    <div class="cbox" id="cbox-temp">
+      <div class="cbox-t" style="flex-wrap:wrap;gap:4px;">
+        <i class="fa-solid fa-temperature-half" style="color:var(--rd)"></i>
+        <span style="margin-right:4px;">Temperatura</span>
+        <button id="ts-btn-ir"     class="cht-tog ts on"  onclick="toggleTempSensor('ir')"     style="--tc:#4a9eff;padding:1px 6px;font-size:9px;">T.Cultivo</button>
+        <button id="ts-btn-target" class="cht-tog ts on"  onclick="toggleTempSensor('target')" style="--tc:#e05555;padding:1px 6px;font-size:9px;">Objetivo</button>
+        <button id="ts-btn-int"    class="cht-tog ts on"  onclick="toggleTempSensor('int')"    style="--tc:#f0a500;padding:1px 6px;font-size:9px;">T.Interior</button>
+        <button id="ts-btn-ext"    class="cht-tog ts on"  onclick="toggleTempSensor('ext')"    style="--tc:#22d3ee;padding:1px 6px;font-size:9px;">T.Exterior</button>
+      </div>
+      <div id="chart_div4"></div>
+    </div>
+    <div class="cbox" id="cbox-pumps">
+      <div class="cbox-t"><i class="fa-solid fa-droplet" style="color:var(--bl)"></i> Bombas</div>
+      <div id="chart_div1"></div>
+    </div>
+  </div>
+  </div> <!-- /tab-container #tab-charts -->
+
+  <!-- PROGRAMA CUSTOM / FSM — tamaño fijo, no crece -->
+  <div class="tab-container" id="tab-advanced">
+  <div class="card c-pu">
+    <div class="ch">
+      <div class="ch-ico" style="background:var(--pu-d);color:var(--pu)"><i class="fa-solid fa-microchip"></i></div>
+      <span class="ch-ttl">Programa Custom / FSM</span>
+      <span id="TName2" style="font-family:var(--f-mono);font-size:10px;color:var(--tx3)"></span>
+    </div>
+    <div class="cb">
+      <!-- FSM display a todo ancho con glow -->
+      <div class="fsm-full" id="fsm-display">
+        <div class="fsm-num" id="CustomStatus">0.0</div>
+        <div class="fsm-right">
+          <div class="fsm-badge" id="custom-prog-badge">C8</div>
+          <div class="fsm-lbl">Estado FSM actual</div>
+          <div class="fsm-bar"><div class="fsm-bar-fill" id="fsm-bar-fill" style="width:0%"></div></div>
+        </div>
+      </div>
+      <!-- Controles en fila -->
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:7px;">
+          <div class="row">
+            <span class="lbl" style="min-width:40px">Slot</span>
+            <select class="field fsm" id="CustomProgram1" style="flex:1">
+              <option value="C1">C1</option><option value="C2">C2</option><option value="C3">C3</option>
+              <option value="C4">C4</option><option value="C5">C5</option><option value="C6">C6</option>
+              <option value="C7">C7</option><option value="C8" selected>C8</option>
+            </select>
+            <input id="CustomInput" type="number" class="num-field" value="0" style="width:64px;flex:0 0 64px">
+            <button class="ib ib-gr" id="CustomSwitch" onclick="toggleCustom()"><i class="fa-solid fa-play"></i> Run</button>
+          </div>
+        </div>
+        <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:7px;">
+          <div class="sec">Optogenética</div>
+          <div class="row">
+            <select class="field fsm" id="LightExcite1" style="flex:1">
+              <option value="LEDB">457 nm</option>
+              <option value="LEDC">500 nm</option><option value="LEDD">523 nm</option>
+              <option value="LEDF">623 nm</option>
+              <option value="LEDG">6500 K</option><option value="LASER650">Láser 650</option>
+            </select>
+            <span style="font-family:var(--f-mono);font-size:10px;color:var(--tx3);min-width:28px" id="LightCurrent">—</span>
+            <button class="ib" id="LightSwitch" onclick="toggleLight()">Switch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS: Fluorescencia + Terminal + Protocolo -->
+  <div style="display:flex;flex-direction:column;">
+    <div class="ctabs" id="adv-ctabs-header">
+      <button class="ctab on" id="ctab-fp"    onclick="switchPane('fp')"   ><i class="fa-solid fa-star"         style="color:var(--am)"></i>  Fluorescencia</button>
+      <button class="ctab"    id="ctab-term"  onclick="switchPane('term')" ><i class="fa-solid fa-terminal"     style="color:var(--tx3)"></i> Terminal</button>
+      <button class="ctab"    id="ctab-proto" onclick="switchPane('proto')"><i class="fa-solid fa-robot"         style="color:var(--pu)"></i>  Protocolo</button>
+    </div>
+    <div class="ctabs-body">
+      <div class="cpane on" id="cpane-fp">
+        <div id="fp-moveable">
+          <div id="fp-desktop-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+            <span style="font-size:11px;font-weight:700;color:var(--tx2)">Proteínas Fluorescentes</span>
+            <button class="ib ib-gr" id="MeasureFP" onclick="measureFP()"><i class="fa-solid fa-wand-magic-sparkles"></i> Medir</button>
+          </div>
+          <div class="fp-grid">
+          <div class="fp-card">
+            <div class="fp-head"><span class="fp-t">FP1</span><button class="ib ib-sm" id="FP1Switch" onclick="toggleFP('FP1')">On/Off</button></div>
+            <div class="fp-sels">
+              <select class="field fsm" id="FPExcite1"><option value="LEDB">457nm</option><option value="LEDC">500nm</option><option value="LEDD">523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select>
+              <select class="field fsm" id="FPGain1"><option value="x1">1x</option><option value="x2">2x</option><option value="x4">4x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select>
+              <select class="field fsm" id="FPBase1"><option value="CLEAR">Clear</option><option value="nm470">470nm</option><option value="nm510">510nm</option><option value="nm550">550nm</option></select>
+              <select class="field fsm" id="FPEmit1A"><option value="nm510">510nm</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option></select>
+            </div>
+            <select class="field fsm" id="FPEmit1B" style="width:100%;margin-bottom:7px"><option value="OFF">Em2: OFF</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select>
+            <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp1-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase1Value">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp1-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit1AValue">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em2</span><div class="fp-tr"><div class="fp-fi" id="fp1-em2" style="width:0%"></div></div><span class="fp-v" id="FPEmit1BValue">—</span></div>
+          </div>
+          <div class="fp-card">
+            <div class="fp-head"><span class="fp-t">FP2</span><button class="ib ib-sm" id="FP2Switch" onclick="toggleFP('FP2')">On/Off</button></div>
+            <div class="fp-sels">
+              <select class="field fsm" id="FPExcite2"><option value="LEDD" selected>523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select>
+              <select class="field fsm" id="FPGain2"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select>
+              <select class="field fsm" id="FPBase2"><option value="CLEAR">Clear</option><option value="nm550">550nm</option><option value="nm583">583nm</option></select>
+              <select class="field fsm" id="FPEmit2A"><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select>
+            </div>
+            <select class="field fsm" id="FPEmit2B" style="width:100%;margin-bottom:7px"><option value="OFF">Em2: OFF</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select>
+            <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp2-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase2Value">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp2-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit2AValue">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em2</span><div class="fp-tr"><div class="fp-fi" id="fp2-em2" style="width:0%"></div></div><span class="fp-v" id="FPEmit2BValue">—</span></div>
+          </div>
+          <div class="fp-card">
+            <div class="fp-head"><span class="fp-t">FP3</span><button class="ib ib-sm" id="FP3Switch" onclick="toggleFP('FP3')">On/Off</button></div>
+            <div class="fp-sels">
+              <select class="field fsm" id="FPExcite3"><option value="LEDF" selected>623nm</option><option value="LASER650">Láser</option></select>
+              <select class="field fsm" id="FPGain3"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select>
+              <select class="field fsm" id="FPBase3"><option value="CLEAR">Clear</option><option value="nm620">620nm</option></select>
+              <select class="field fsm" id="FPEmit3A"><option value="nm620">620nm</option><option value="nm670">670nm</option></select>
+            </div>
+            <select class="field fsm" id="FPEmit3B" style="width:100%;margin-bottom:7px"><option value="OFF">Em2: OFF</option><option value="nm670">670nm</option></select>
+            <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp3-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase3Value">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp3-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit3AValue">—</span></div>
+            <div class="fp-br"><span class="fp-l">Em2</span><div class="fp-tr"><div class="fp-fi" id="fp3-em2" style="width:0%"></div></div><span class="fp-v" id="FPEmit3BValue">—</span></div>
+          </div>
+        </div>
+        </div> <!-- /fp-moveable -->
+      </div>
+      <div class="cpane" id="cpane-term">
+        <div class="card c-gr" style="border-radius: var(--rsm); border-left: 3px solid var(--gr); overflow:hidden; display:flex; flex-direction:column;">
+          <div class="ch" style="padding: 6px 11px;">
+            <div class="ch-ico" style="background:var(--gr-d);color:var(--gr)"><i class="fa-solid fa-terminal"></i></div>
+            <span class="ch-ttl">Terminal del Reactor</span>
+            <button class="ib ib-sm btn-ghost" id="ClearTerminal" onclick="clearTerm()"><i class="fa-solid fa-trash-can"></i> Limpiar</button>
+          </div>
+          <div class="terminal" id="termI" style="border:none; border-radius: 0; padding:12px; min-height:180px;"></div>
+        </div>
+      </div>
+      <!-- PANEL PROTOCOLO IA -->
+      <div class="cpane" id="cpane-proto">
+        <div style="display:flex;flex-direction:column;gap:9px;padding:2px 0;">
+          <!-- Botón analizar -->
+          <button class="btn btn-go" id="proto-analyze-btn" onclick="analyzeProtocol()" style="width:100%;justify-content:center;">
+            <i class="fa-solid fa-robot"></i> Analizar protocolo activo
+          </button>
+          <!-- Resultado -->
+          <div id="proto-result" style="
+            background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);
+            padding:11px 13px;font-size:12px;color:var(--tx2);line-height:1.7;
+            min-height:120px;max-height:280px;overflow-y:auto;
+            font-family:var(--f-ui);
+          ">
+            <span style="color:var(--tx3);font-style:italic;">Pulsa Analizar para obtener una descripción del protocolo en ejecución.</span>
+          </div>
+          <!-- Código raw colapsable -->
+          <details style="font-size:10px;">
+            <summary style="cursor:pointer;color:var(--tx3);font-family:var(--f-mono);padding:3px 0;">Ver código fuente (protocolo.py)</summary>
+            <pre id="proto-raw-code" style="
+              margin-top:6px;background:var(--bg);border:1px solid var(--bd);
+              border-radius:var(--rsm);padding:9px;font-family:var(--f-mono);
+              font-size:10px;color:var(--tx3);overflow-x:auto;max-height:200px;
+              overflow-y:auto;white-space:pre;
+            ">—</pre>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div> <!-- /tab-container #tab-advanced -->
+
+</div><!-- /col-c -->
+
+<!-- ══════════════ COLUMNA DERECHA ════════════════════════ -->
+<div class="col-r">
+  <div class="tab-container" id="tab-actuators">
+
+  <!-- LEDs & Láser — toggles con color del LED -->
+  <div class="card c-am">
+    <div class="ch"><div class="ch-ico" style="background:var(--am-d);color:var(--am)"><i class="fa-solid fa-lightbulb"></i></div><span class="ch-ttl">LEDs & Láser</span></div>
+    <div class="cb" style="padding:7px;flex:1;min-height:0;">
+      <div class="led-grid">
+        <!-- --led-rgb en cada fila controla el color del toggle y del borde cuando está on -->
+        <div class="led-row" id="led-row-LEDB" style="--led-rgb:30,64,175">
+          <div class="led-name-box"><div class="led-dot" style="background:#1e40af"></div><span class="led-name">457 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDB',-0.1)">−</button><input type="number" class="led-inp" id="LEDBInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDB',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDBSet" onclick="setLED('LEDB')">Set</button>
+          <span class="led-val" id="LEDBCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:30,64,175"><input type="checkbox" id="LEDB-tog" onchange="switchLED('LEDB',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDC" style="--led-rgb:13,148,136">
+          <div class="led-name-box"><div class="led-dot" style="background:#0d9488"></div><span class="led-name">500 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDC',-0.1)">−</button><input type="number" class="led-inp" id="LEDCInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDC',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDCSet" onclick="setLED('LEDC')">Set</button>
+          <span class="led-val" id="LEDCCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:13,148,136"><input type="checkbox" id="LEDC-tog" onchange="switchLED('LEDC',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDD" style="--led-rgb:21,128,61">
+          <div class="led-name-box"><div class="led-dot" style="background:#15803d"></div><span class="led-name">523 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDD',-0.1)">−</button><input type="number" class="led-inp" id="LEDDInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDD',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDDSet" onclick="setLED('LEDD')">Set</button>
+          <span class="led-val" id="LEDDCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:21,128,61"><input type="checkbox" id="LEDD-tog" onchange="switchLED('LEDD',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDF" style="--led-rgb:185,28,28">
+          <div class="led-name-box"><div class="led-dot" style="background:#b91c1c"></div><span class="led-name">623 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDF',-0.1)">−</button><input type="number" class="led-inp" id="LEDFInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDF',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDFSet" onclick="setLED('LEDF')">Set</button>
+          <span class="led-val" id="LEDFCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:185,28,28"><input type="checkbox" id="LEDF-tog" onchange="switchLED('LEDF',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDG" style="--led-rgb:203,213,225">
+          <div class="led-name-box"><div class="led-dot" style="background:#cbd5e1;border:1px solid var(--bd)"></div><span class="led-name">6500 K</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDG',-0.1)">−</button><input type="number" class="led-inp" id="LEDGInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDG',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDGSet" onclick="setLED('LEDG')">Set</button>
+          <span class="led-val" id="LEDGCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:203,213,225"><input type="checkbox" id="LEDG-tog" onchange="switchLED('LEDG',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LASER650" style="--led-rgb:220,38,38">
+          <div class="led-name-box"><div class="led-dot" style="background:#dc2626"></div><span class="led-name">Láser 650</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LASER650',-0.1)">−</button><input type="number" class="led-inp" id="LASER650Input" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LASER650',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LASER650Set" onclick="setLED('LASER650')">Set</button>
+          <span class="led-val" id="LASER650Current">0.00</span>
+          <label class="tog" style="--led-rgb:220,38,38"><input type="checkbox" id="LASER650-tog" onchange="switchLED('LASER650',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-UV" style="--led-rgb:109,40,217">
+          <div class="led-name-box"><div class="led-dot" style="background:#6d28d9"></div><span class="led-name">UV 280</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('UV',-0.1)">−</button><input type="number" class="led-inp" id="UVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('UV',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="UVSet" onclick="setLED('UV')">Set</button>
+          <span class="led-val" id="UVCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:109,40,217"><input type="checkbox" id="UV-tog" onchange="switchLED('UV',this.checked)"><span class="tog-t"></span></label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bombas Peristálticas — card y rows se iluminan en azul al encender -->
+  <div class="card c-bl" id="pumps-card">
+    <div class="ch"><div class="ch-ico" style="background:var(--bl-d);color:var(--bl)"><i class="fa-solid fa-droplet"></i></div><span class="ch-ttl">Bombas Peristálticas</span></div>
+    <div class="cb" style="padding:8px">
+      <div class="pump-grid">
+        <div class="pump-row" id="pump-row-1">
+          <div class="pump-hdr"><span class="pump-nm">P1 — Entrada</span></div>
+          <div class="pump-ct"><button class="ib ib-sm" id="Pump1Switch" onclick="switchPump('Pump1')">On</button><button class="ib ib-sm" id="Pump1Direction" onclick="dirPump('Pump1')">⇌</button></div>
+        </div>
+        <div class="pump-row" id="pump-row-2">
+          <div class="pump-hdr"><span class="pump-nm">P2 — Salida</span></div>
+          <div class="pump-tr"><div class="pump-fi" id="pump-fill-2" style="width:0%"></div></div>
+          <div class="pump-ct"><button class="ib ib-sm" id="Pump2Switch" onclick="switchPump('Pump2')">On</button><button class="ib ib-sm" id="Pump2Direction" onclick="dirPump('Pump2')">⇌</button></div>
+        </div>
+        <div class="pump-row" id="pump-row-3">
+          <div class="pump-hdr"><span class="pump-nm">P3 — Auxiliar</span></div>
+          <div class="pump-tr"><div class="pump-fi" id="pump-fill-3" style="width:0%"></div></div>
+          <div class="pump-ct"><button class="ib ib-sm" id="Pump3Switch" onclick="switchPump('Pump3')">On</button><button class="ib ib-sm" id="Pump3Direction" onclick="dirPump('Pump3')">⇌</button></div>
+        </div>
+        <div class="pump-row" id="pump-row-4">
+          <div class="pump-hdr"><span class="pump-nm">P4 — Auxiliar</span></div>
+          <div class="pump-tr"><div class="pump-fi" id="pump-fill-4" style="width:0%"></div></div>
+          <div class="pump-ct"><button class="ib ib-sm" id="Pump4Switch" onclick="switchPump('Pump4')">On</button><button class="ib ib-sm" id="Pump4Direction" onclick="dirPump('Pump4')">⇌</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fluorescencia Móvil (Placeholder) -->
+  <div class="card c-am" id="fp-mob-card" style="display:none;">
+    <div class="ch">
+      <div class="ch-ico" style="background:var(--am-d);color:var(--am)"><i class="fa-solid fa-star"></i></div>
+      <span class="ch-ttl">Fluorescencia</span>
+      <button class="ib ib-gr ib-sm" id="MeasureFPMob" onclick="measureFP()" style="margin-left:auto"><i class="fa-solid fa-wand-magic-sparkles"></i> Medir</button>
+    </div>
+    <div class="cb" style="padding:8px;" id="fp-mob-body"></div>
+  </div>
+
+  <!-- Espectrómetro AS7341 -->
+  <div class="card c-pu">
+    <div class="ch">
+      <div class="ch-ico" style="background:var(--pu-d);color:var(--pu)"><i class="fa-solid fa-chart-bar"></i></div>
+      <span class="ch-ttl">Espectrómetro AS7341</span>
+      <select class="field fsm" id="SpectrumGain" style="width:54px;margin-left:auto">
+        <option value="x1">1x</option><option value="x2">2x</option><option value="x4">8x</option>
+        <option value="x6">32x</option><option value="x8">128x</option><option value="x10">512x</option>
+      </select>
+      <button class="ib ib-gr ib-sm" id="GetSpectrum" onclick="measureSpectrum()" style="margin-left:5px"><i class="fa-solid fa-atom"></i></button>
+    </div>
+    <div class="cb">
+      <div class="spec-grid">
+        <div class="spec-tile"><div class="val" id="410nmSense">—</div><div class="sub">410 nm</div></div>
+        <div class="spec-tile"><div class="val" id="440nmSense">—</div><div class="sub">440 nm</div></div>
+        <div class="spec-tile"><div class="val" id="470nmSense">—</div><div class="sub">470 nm</div></div>
+        <div class="spec-tile"><div class="val" id="510nmSense">—</div><div class="sub">510 nm</div></div>
+        <div class="spec-tile"><div class="val" id="550nmSense">—</div><div class="sub">550 nm</div></div>
+        <div class="spec-tile"><div class="val" id="583nmSense">—</div><div class="sub">583 nm</div></div>
+        <div class="spec-tile"><div class="val" id="620nmSense">—</div><div class="sub">620 nm</div></div>
+        <div class="spec-tile"><div class="val" id="670nmSense">—</div><div class="sub">670 nm</div></div>
+        <div class="spec-tile"><div class="val" id="ClearSense">—</div><div class="sub">Clear</div></div>
+      </div>
+    </div>
+  </div>
+
+  </div> <!-- /tab-container #tab-actuators -->
+</div><!-- /col-r -->
+</div><!-- /page -->
+
+
+</div><!-- /nexus-main -->
+
+<!-- NEXUS: Panel Architect -->
+<div id="nexus-architect">
+  <iframe src="/architect" title="Chi.Bio Architect" allowfullscreen></iframe>
+</div>
+
+<!-- NEXUS: Panel Cámara -->
+<div id="nexus-camera" data-cam-base="https://camera.primbiolab.org">
+  <div id="cam-rotate-hint">
+    <div class="rotate-icon-wrap"><i class="fa-solid fa-mobile-screen-button"></i></div>
+    <p>Gira tu teléfono a <strong>horizontal</strong><br>para ver la cámara</p>
+  </div>
+  <div id="cam-inner">
+    <div id="cam-video-area">
+      <img id="cam-feed" alt="Stream de cámara" draggable="false">
+      <div id="cam-offline-badge"><i class="fa-solid fa-video-slash"></i><span>Cámara sin conexión</span></div>
+    </div>
+    <div id="cam-sidebar">
+      <div class="cam-sidebar-hdr">
+        <span><i class="fa-solid fa-sliders"></i> Imagen</span>
+        <span id="cam-status-dot" class="cam-dot unknown" title="Estado de cámara"></span>
+      </div>
+      <div class="cam-ctrl">
+        <div class="cam-ctrl-label"><span>Brillo</span><span id="cam-brightness-val">1.00</span></div>
+        <input type="range" id="cam-brightness" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+      </div>
+      <div class="cam-ctrl">
+        <div class="cam-ctrl-label"><span>Contraste</span><span id="cam-contrast-val">1.00</span></div>
+        <input type="range" id="cam-contrast" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+      </div>
+      <div class="cam-ctrl">
+        <div class="cam-ctrl-label"><span>Saturación</span><span id="cam-saturation-val">1.00</span></div>
+        <input type="range" id="cam-saturation" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+      </div>
+      <div class="cam-ctrl">
+        <div class="cam-ctrl-label"><span>Calidad JPEG</span><span id="cam-quality-val">80</span></div>
+        <input type="range" id="cam-quality" min="30" max="100" step="5" value="80" oninput="onCamSlider()">
+      </div>
+      <div class="cam-sidebar-hdr" style="margin-top:2px;">
+        <span><i class="fa-solid fa-circle-info"></i> Estado</span>
+      </div>
+      <div class="cam-info-row">
+        <span class="cam-info-label">FPS</span>
+        <span id="cam-fps-val" class="cam-info-val">--</span>
+      </div>
+      <div class="cam-info-row">
+        <span class="cam-info-label">Reactor activo</span>
+        <span id="cam-reactor-val" class="cam-info-val">--</span>
+      </div>
+      <div class="cam-info-row">
+        <span class="cam-info-label">Experimento</span>
+        <span id="cam-exp-badge" class="cam-exp-badge stopped">--</span>
+      </div>
+      <button class="btn btn-ghost" onclick="captureCamFrame(this)" style="width:100%;font-size:11px;">
+        <i class="fa-solid fa-camera"></i> Capturar frame
+      </button>
+      <button class="btn btn-ghost" onclick="resetCameraSettings()" style="width:100%;font-size:11px;">
+        <i class="fa-solid fa-rotate-left"></i> Restablecer imagen
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TABS MÓVILES INFERIORES — fuera de nexus-main para que nunca se oculten -->
+<div id="mob-tabs">
+  <button class="mob-tab active" onclick="switchMobTab('charts', this)"><i class="fa-solid fa-chart-line"></i><span>Gráficas</span></button>
+  <button class="mob-tab" onclick="switchMobCamera(this)"><i class="fa-solid fa-video"></i><span>Cámara</span></button>
+  <button class="mob-tab" onclick="switchMobTab('advanced', this)"><i class="fa-solid fa-microchip"></i><span>Avanzado</span></button>
+</div>
+
+<div hidden id="GraphReplot" value="0"></div>
+<div hidden id="FPRefresh"></div>
+<div id="main-tour-overlay">
+  <div id="main-tour-backdrop" onclick="mainTourSkip()"></div>
+  <div id="main-tour-highlight"></div>
+  <div id="main-tour-box">
+    <h4><i class="fa-solid fa-flask-vial"></i> <span id="main-tour-title">Bienvenido</span></h4>
+    <p id="main-tour-desc"></p>
+    <div class="main-tour-footer">
+      <span class="main-tour-count" id="main-tour-count">1 / 1</span>
+      <button class="main-tour-skip" onclick="mainTourSkip()">Saltar tour</button>
+      <div class="main-tour-nav">
+        <button class="btn btn-ghost" id="main-tour-btn-prev" onclick="mainTourPrev()" style="padding:4px 10px;font-size:11px;">← Ant.</button>
+        <button class="btn btn-go"    id="main-tour-btn-next" onclick="mainTourNext()" style="padding:4px 10px;font-size:11px;">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="nexus-tour-highlight"></div>
+<div id="nexus-topbar-dim-left"></div>
+<div id="nexus-topbar-dim-right"></div>
+<div id="toasts"></div>
+
+<script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
+</body>
+</html>

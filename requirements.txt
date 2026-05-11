@@ -1,0 +1,11 @@
+# Chi.Bio Nexus — BeagleBone Black
+# Instalar con: pip install -r requirements.txt
+
+flask
+gunicorn
+numpy
+Adafruit-GPIO
+Adafruit-BBIO
+pyserial
+simplejson
+smbus2

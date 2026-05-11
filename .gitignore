@@ -1,0 +1,51 @@
+# ── Python ────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.Python
+
+# ── Entorno virtual ───────────────────────────────────────────
+venv/
+env/
+.venv/
+
+# ── Secretos y configuración local ───────────────────────────
+config.py
+.env
+*.env
+
+# ── Archivos de runtime Chi.Bio ───────────────────────────────
+# protocolo.py se genera en ejecución; nunca commitear
+protocolo.py
+
+# ── Archivos ajenos al proyecto ───────────────────────────────
+sd.py
+chat.csv
+
+# ── Documentos internos de trabajo ────────────────────────────
+CAMERA_SERVER_EXPANSION_PLAN.md
+reglas.md
+
+# ── Logs y datos temporales ───────────────────────────────────
+*.log
+*.csv
+characterisation_data_*.txt
+
+# ── Claude Code (configuración local del asistente) ──────────
+.claude/
+
+# ── Artefactos del sistema ────────────────────────────────────
+~/
+
+# ── IDE y sistema operativo ───────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

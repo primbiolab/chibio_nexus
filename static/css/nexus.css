@@ -1,0 +1,777 @@
+/* ── Variables ─────────────────────────────────────────────── */
+:root{
+  --bg:#0b0e14; --s1:#10141c; --s2:#181e2a; --s3:#1e2638;
+  --bd:#253045; --bd2:#2e3a52;
+  --gr:#00d68f; --gr-d:rgba(0,214,143,.13); --gr-g:0 0 14px rgba(0,214,143,.28);
+  --am:#f0a500; --am-d:rgba(240,165,0,.13);
+  --rd:#e05555; --rd-d:rgba(224,85,85,.11);
+  --bl:#4a9eff; --bl-d:rgba(74,158,255,.13); --bl-g:0 0 16px rgba(74,158,255,.35);
+  --pu:#a78bfa; --pu-d:rgba(167,139,250,.13); --pu-g:0 0 18px rgba(167,139,250,.5);
+  --cy:#22d3ee; --cy-d:rgba(34,211,238,.13);
+  --tx:#e2ecf8; --tx2:#a0bcd4; --tx3:#6080a0;
+  --f-ui:'Nunito',sans-serif;
+  --f-mono:'IBM Plex Mono',monospace;
+  --f-disp:'Bebas Neue',sans-serif;
+  --r:8px; --rsm:5px;
+  --topbar-h:50px;
+  --col-l:252px;
+  --col-r:295px;
+}
+[data-theme="light"] {
+  /* Capas con más separación tonal */
+  --bg:#e8edf5; --s1:#ffffff; --s2:#f3f5f9; --s3:#e4e9f0;
+  /* Bordes más definidos */
+  --bd:#b2bdcc; --bd2:#c8d2df;
+  /* Acentos más saturados */
+  --gr:#00916a; --gr-d:rgba(0,145,106,.12); --gr-g:0 0 14px rgba(0,145,106,.22);
+  --am:#b87200; --am-d:rgba(184,114,0,.12);
+  --rd:#c41e2a; --rd-d:rgba(196,30,42,.10);
+  --bl:#1a58d0; --bl-d:rgba(26,88,208,.12); --bl-g:0 0 16px rgba(26,88,208,.28);
+  --pu:#6420cc; --pu-d:rgba(100,32,204,.10); --pu-g:0 0 18px rgba(100,32,204,.28);
+  --cy:#0773a0; --cy-d:rgba(7,115,160,.12);
+  /* Texto con más contraste */
+  --tx:#0d1b2e; --tx2:#243554; --tx3:#4e6680;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;}
+body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--f-ui);font-size:13px;overflow:hidden;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px;}
+input,select{font-family:var(--f-ui);}
+
+/* ── TOPBAR ─────────────────────────────────────────────────── */
+#topbar{
+  position:fixed;top:0;left:0;right:0;z-index:300;
+  height:var(--topbar-h);background:var(--s1);border-bottom:1px solid var(--bd);
+  display:flex;align-items:center;padding:0 14px;gap:9px;
+}
+.logo{display:flex;align-items:center;gap:9px;text-decoration:none;flex-shrink:0;}
+.logo-icon{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,rgba(0,214,143,.15),rgba(0,214,143,.32));border:1px solid rgba(0,214,143,.4);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--gr);}
+.logo-l1{font-weight:800;font-size:14px;color:var(--tx);}
+.logo-l1 span{color:var(--gr);}
+.logo-l2{font-family:var(--f-mono);font-size:9px;color:var(--tx3);letter-spacing:.6px;}
+.tb-content{display:flex;align-items:center;gap:9px;flex:1;}
+.tb-sep{width:1px;height:22px;background:var(--bd);flex-shrink:0;}
+.dev-row{display:flex;gap:3px;}
+.dev-btn{padding:3px 9px;border-radius:var(--rsm);background:transparent;border:1px solid var(--bd);color:var(--tx3);font-family:var(--f-ui);font-weight:700;font-size:11px;cursor:pointer;transition:all .12s;}
+.dev-btn:hover:not(:disabled){border-color:var(--bd2);color:var(--tx2);}
+.dev-btn.active{background:var(--gr-d);border-color:var(--gr);color:var(--gr);}
+.dev-btn:disabled{opacity:.3;cursor:default;}
+
+/* Status pills */
+.spill{display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:var(--rsm);font-family:var(--f-ui);font-weight:700;font-size:11px;flex-shrink:0;border:1px solid var(--rd);color:var(--rd);transition:all .3s;}
+.spill.on{border-color:var(--gr);color:var(--gr);}
+.sdot{width:6px;height:6px;border-radius:50%;background:var(--rd);transition:all .3s;}
+.spill.on .sdot{background:var(--gr);box-shadow:var(--gr-g);animation:blink 1.5s ease infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* Cloud pill — animación azul pulsante cuando descarga */
+.cpill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:var(--rsm);font-family:var(--f-ui);font-weight:700;font-size:11px;flex-shrink:0;border:1px solid var(--bd);color:var(--tx3);transition:all .4s;position:relative;overflow:hidden;}
+.cpill.ok{border-color:var(--bl);color:var(--bl);}
+.cpill.new{border-color:var(--gr);color:var(--gr);}
+.cpill.err{border-color:var(--rd);color:var(--rd);}
+/* Pulso azul de descarga */
+.cpill.downloading{
+  border-color:var(--bl);color:var(--bl);
+  animation:cloud-pulse 1s ease infinite;
+}
+@keyframes cloud-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(74,158,255,.0);}
+  50%{box-shadow:0 0 0 4px rgba(74,158,255,.35), 0 0 12px rgba(74,158,255,.25);}
+}
+/* icono giratorio durante descarga */
+.cpill.downloading .cloud-ico{animation:spin-slow 1.2s linear infinite;}
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+.tb-text{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
+.mob-menu-btn{display:none;}
+.desktop-hidden{display:none;}
+
+#cyc{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--tx3);padding:3px 9px;border:1px solid var(--bd);border-radius:var(--rsm);}
+.tb-r{margin-left:auto;display:flex;align-items:center;gap:6px;}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:var(--rsm);font-family:var(--f-ui);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:all .12s;white-space:nowrap;}
+.btn:active{transform:scale(.95);}
+.btn:disabled{opacity:.35;pointer-events:none;}
+.btn-ghost{background:transparent;border:1px solid var(--bd);color:var(--tx2);}
+.btn-ghost:hover{background:var(--s2);border-color:var(--bd2);color:var(--tx);}
+.btn-go{background:var(--gr);color:#000;box-shadow:var(--gr-g);}
+.btn-go:hover{filter:brightness(1.1);}
+.btn-stop{background:var(--rd-d);border:1px solid var(--rd);color:var(--rd);}
+.btn-scan{background:var(--bl-d);border:1px solid var(--bl);color:var(--bl);}
+
+
+
+/* ── PAGE LAYOUT ──────────────────────────────────────────── */
+#page{
+  position:fixed;top:var(--topbar-h);left:0;right:0;bottom:0;
+  display:grid;
+  grid-template-columns:var(--col-l) 1fr var(--col-r);
+  overflow:hidden;
+}
+.col-l,.col-c,.col-r{height:100%;overflow-y:auto;overflow-x:hidden;}
+.col-l{border-right:1px solid var(--bd);padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+.col-c{padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+.col-r{border-left:1px solid var(--bd);padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+
+/* Tab Containers para gestionar secciones modulares (solo visibles en movil o si se configuran) */
+.tab-container{display:flex;flex-direction:column;gap:9px;}
+#tab-setup{}
+#tab-charts{flex:1;min-height:400px;}
+#tab-advanced{flex-shrink:0;}
+#tab-actuators{}
+
+/* ── ANIMATIONS ───────────────────────────────────────────── */
+@keyframes slideUp{
+  from{opacity:0;transform:translateY(15px);}
+  to{opacity:1;transform:translateY(0);}
+}
+@keyframes fadeIn{
+  from{opacity:0;}
+  to{opacity:1;}
+}
+
+/* ── CARD ─────────────────────────────────────────────────── */
+.card{background:var(--s1);border-radius:var(--r);border:1px solid var(--bd);overflow:hidden;border-left:3px solid var(--bd);flex-shrink:0;transition:border-color .3s, box-shadow .3s, transform .2s; animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;}
+.card.c-gr{border-left-color:var(--gr);}
+.card.c-rd{border-left-color:var(--rd);}
+.card.c-am{border-left-color:var(--am);}
+.card.c-bl{border-left-color:var(--bl);}
+.card.c-pu{border-left-color:var(--pu);}
+.card.c-cy{border-left-color:var(--cy);}
+/* Bomba encendida → glow azul */
+.card.pump-on{
+  border-color:rgba(74,158,255,.6);
+  border-left-color:var(--bl);
+  box-shadow:0 0 0 1px rgba(74,158,255,.2), var(--bl-g);
+  background:rgba(74,158,255,.04);
+}
+.ch{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--s2);border-bottom:1px solid var(--bd);}
+.ch-ico{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+.ch-ttl{font-weight:700;font-size:12px;color:var(--tx);flex:1;}
+.cb{padding:10px 11px;display:flex;flex-direction:column;gap:8px;}
+
+/* ── FORM ELEMENTS ────────────────────────────────────────── */
+/* FIX: inputs con ancho controlado, no overflow */
+.field{
+  background:var(--s2);border:1px solid var(--bd2);color:var(--tx);
+  border-radius:var(--rsm);padding:5px 7px;font-family:var(--f-mono);
+  font-size:11px;outline:none;transition:border-color .15s;
+  width:100%;min-width:0; /* min-width:0 para que flex no lo desborde */
+  color-scheme:light dark; /* FIX: spinner visible en dark mode */
+}
+.field:focus{border-color:var(--gr);}
+.fsm{padding:4px 6px;font-size:11px;}
+select.field{cursor:pointer;}
+
+/* Fila de controles — FIX: sin solapamiento */
+.row{display:flex;align-items:center;gap:6px;min-width:0;}
+.lbl{font-size:11px;font-weight:700;color:var(--tx2);flex-shrink:0;white-space:nowrap;}
+
+/* FIX CRÍTICO: el input numérico de OD/Temp/Stir tiene ancho mínimo
+   para que el spin button no tape el valor */
+.num-field{
+  background:var(--s2);border:1px solid var(--bd2);color:var(--tx);
+  border-radius:var(--rsm);
+  /* padding-right generoso para dejar espacio al spinner */
+  padding:4px 24px 4px 7px;
+  font-family:var(--f-mono);font-size:11px;
+  outline:none;transition:border-color .15s;
+  min-width:0;flex:1;
+  color-scheme:light dark;
+  -moz-appearance:textfield; /* Firefox: ocultar spinner y usar el nativo */
+}
+.num-field:focus{border-color:var(--gr);}
+/* Chrome/Safari: asegurar que el spinner sea visible */
+.num-field::-webkit-inner-spin-button{
+  opacity:1;
+  cursor:pointer;
+}
+
+/* Toggle — color dinámico vía CSS variable */
+.tog{position:relative;width:36px;height:19px;flex-shrink:0;cursor:pointer;}
+.tog input{opacity:0;width:0;height:0;}
+.tog-t{
+  position:absolute;inset:0;background:var(--s3);
+  border:1px solid var(--bd2);border-radius:20px;transition:all .2s;
+}
+.tog-t::after{
+  content:'';position:absolute;width:13px;height:13px;left:2px;top:2px;
+  background:var(--tx3);border-radius:50%;transition:all .2s;
+}
+/* Color del toggle = color del LED (vía CSS variable --led-color) */
+.tog input:checked+.tog-t{
+  background:rgba(var(--led-rgb,0,214,143),.15);
+  border-color:rgb(var(--led-rgb,0,214,143));
+}
+.tog input:checked+.tog-t::after{
+  transform:translateX(17px);
+  background:rgb(var(--led-rgb,0,214,143));
+  box-shadow:0 0 6px rgba(var(--led-rgb,0,214,143),.6);
+}
+
+/* ib: inline button */
+.ib{padding:4px 9px;font-size:11px;font-weight:700;flex-shrink:0;background:var(--s2);border:1px solid var(--bd2);color:var(--tx2);border-radius:var(--rsm);cursor:pointer;font-family:var(--f-ui);transition:all .12s;white-space:nowrap;}
+.ib:hover{color:var(--tx);background:var(--s3);}
+.ib:disabled{opacity:.3;pointer-events:none;}
+.ib-gr{border-color:var(--gr);color:var(--gr);}
+.ib-gr:hover{background:var(--gr-d);}
+.ib-sm{padding:2px 5px;font-size:10px;}
+
+/* Mode buttons */
+.mb{width:100%;padding:6px 10px;border-radius:var(--rsm);border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f-ui);font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;}
+.mb:hover{background:var(--s3);color:var(--tx);}
+.mb.on{background:var(--gr-d);border-color:var(--gr);color:var(--gr);}
+.mb.on-rd{background:var(--rd-d);border-color:var(--rd);color:var(--rd);}
+.mb.on-am{background:var(--am-d);border-color:var(--am);color:var(--am);}
+.mb.on-pu{background:var(--pu-d);border-color:var(--pu);color:var(--pu);}
+
+.sec{font-family:var(--f-mono);font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:1.8px;display:flex;align-items:center;gap:6px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--bd);}
+
+/* ── OD BIG ───────────────────────────────────────────────── */
+.od-row{display:flex;align-items:flex-end;gap:10px;min-width:0;}
+.od-big{font-family:var(--f-disp);font-size:42px;line-height:1;color:var(--gr);letter-spacing:1px;flex-shrink:0;}
+.meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;min-width:0;}
+.mbox{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);padding:5px 8px;min-width:0;overflow:hidden;}
+.mlbl{font-size:9px;font-family:var(--f-mono);color:var(--tx3);margin-bottom:1px;text-transform:uppercase;letter-spacing:.8px;}
+.mval{font-family:var(--f-mono);font-size:13px;font-weight:600;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ── TEMP TILES ───────────────────────────────────────────── */
+.temp-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
+.ttile{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);padding:7px 4px;text-align:center;cursor:pointer;transition:all .15s;}
+.ttile:hover{border-color:var(--bd2);background:var(--s3);}
+.ttile .val{font-family:var(--f-disp);font-size:19px;color:var(--tx);line-height:1;}
+.ttile .sub{font-size:9px;font-weight:700;color:var(--tx3);margin-top:2px;}
+.ttile.hot .val{color:var(--rd);}
+
+/* ── STIR ─────────────────────────────────────────────────── */
+.stir-wrap{display:flex;align-items:center;gap:9px;min-width:0;}
+.sorb{width:38px;height:38px;border-radius:50%;flex-shrink:0;border:2px solid var(--bd2);display:flex;align-items:center;justify-content:center;transition:all .3s;}
+.sorb.spin{border-color:var(--am);box-shadow:0 0 10px rgba(240,165,0,.2);animation:rotor calc(var(--spd,1.5s)) linear infinite;}
+@keyframes rotor{to{transform:rotate(360deg);}}
+.sorb i{color:var(--tx3);font-size:13px;transition:color .3s;}
+.sorb.spin i{color:var(--am);}
+
+/* ── CALIBRACIÓN COLAPSABLE ───────────────────────────────── */
+.cal-body{overflow:hidden;transition:max-height .35s ease, opacity .25s ease;}
+.cal-body.collapsed{max-height:0;opacity:0;}
+.cal-body.expanded{max-height:400px;opacity:1;}
+.cal-toggle{
+  background:transparent;border:none;cursor:pointer;
+  color:var(--tx3);font-size:11px;display:flex;align-items:center;gap:4px;
+  font-family:var(--f-ui);font-weight:700;padding:0;
+  transition:color .15s;
+}
+.cal-toggle:hover{color:var(--cy);}
+.cal-toggle i{font-size:9px;transition:transform .3s;}
+.cal-toggle.expanded i{transform:rotate(90deg);}
+
+/* ── FSM DISPLAY (ocupa todo el ancho, con glow) ─────────── */
+.fsm-full{
+  background:var(--bg);
+  border:1px solid rgba(167,139,250,.3);
+  border-radius:var(--rsm);
+  padding:12px 14px;
+  display:flex;align-items:center;gap:14px;
+  /* Glow púrpura */
+  box-shadow:0 0 0 1px rgba(167,139,250,.1), var(--pu-g);
+  transition:box-shadow .3s;
+}
+.fsm-full.active{
+  box-shadow:0 0 0 1px rgba(167,139,250,.3), 0 0 28px rgba(167,139,250,.65);
+}
+.fsm-num{font-family:var(--f-disp);font-size:52px;color:var(--pu);line-height:1;flex-shrink:0;}
+.fsm-right{flex:1;min-width:0;}
+.fsm-badge{
+  display:inline-flex;align-items:center;
+  font-family:var(--f-mono);font-size:10px;color:var(--pu);
+  background:var(--pu-d);border:1px solid rgba(167,139,250,.35);
+  border-radius:4px;padding:2px 8px;margin-bottom:5px;
+}
+.fsm-lbl{font-size:11px;color:var(--tx3);font-weight:600;}
+/* Barra de estado FSM */
+.fsm-bar{height:3px;background:var(--bd);border-radius:2px;margin-top:6px;overflow:hidden;}
+.fsm-bar-fill{height:100%;background:linear-gradient(90deg,var(--pu),rgba(167,139,250,.4));border-radius:2px;transition:width .5s;}
+
+/* ── CHARTS GRID 2×2 ─────────────────────────────────────── */
+.charts4{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;
+  gap:8px;
+  flex:1;
+  min-height:0;
+}
+/* Toggles de gráficas y sensores */
+.cht-tog{
+  padding:3px 9px;border-radius:var(--rsm);
+  background:var(--s2);border:1px solid var(--bd2);
+  color:var(--tx3);font-family:var(--f-ui);font-size:10px;font-weight:700;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;
+}
+.cht-tog:hover{color:var(--tx2);background:var(--s3);}
+.cht-tog.on{background:var(--gr-d);border-color:var(--gr);color:var(--gr);}
+/* Toggles de sensores de temperatura — color propio */
+.cht-tog.ts.on{
+  background:rgba(var(--tc-rgb,74,158,255),.12);
+  border-color:var(--tc,var(--bl));
+  color:var(--tc,var(--bl));
+}
+/* Asignar --tc a cada botón vía inline style ya hecho */
+
+.cbox{
+  background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);
+  padding:8px;display:flex;flex-direction:column;overflow:hidden;
+  min-height:0; animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; transition:transform .2s;
+}
+/* Forzar tema oscuro en Google Charts */
+.cbox svg { background: transparent !important; }
+.cbox > div > div { background: transparent !important; }
+.cbox > div { background: transparent !important; }
+/* Texto de ejes y leyenda en Google Charts → color claro */
+.cbox text { fill: #a0bcd4 !important; font-family: "Nunito", sans-serif !important; }
+/* Líneas de grid → muy tenues */
+.cbox line, .cbox rect[fill="#ffffff"], .cbox rect[fill="white"] {
+  stroke: #253045 !important;
+}
+.cbox-t{font-size:10.5px;font-weight:700;color:var(--tx2);margin-bottom:4px;display:flex;align-items:center;gap:5px;flex-shrink:0;}
+.cbox>div[id^="chart_div"]{flex:1;min-height:0;width:100%;}
+
+/* ── TABS (FP + Terminal) ────────────────────────────────── */
+.ctabs{display:flex;border-bottom:1px solid var(--bd);background:var(--s1);border-radius:var(--r) var(--r) 0 0;flex-shrink:0;}
+.ctab{padding:7px 14px;background:transparent;border:none;color:var(--tx3);cursor:pointer;font-family:var(--f-ui);font-size:11.5px;font-weight:700;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:5px;transition:all .12s;}
+.ctab:hover{color:var(--tx2);background:rgba(255,255,255,.03);}
+.ctab.on{color:var(--tx);border-bottom-color:var(--gr);}
+.ctabs-body{background:var(--s1);border:1px solid var(--bd);border-top:none;border-radius:0 0 var(--r) var(--r);flex-shrink:0;}
+.cpane{display:none;padding:10px;}
+.cpane.on{display:block;}
+.terminal{background:#050810;border:1px solid var(--bd);border-radius:var(--rsm);font-family:var(--f-mono);font-size:10.5px;color:#4ecb8a;height:170px;overflow-y:auto;padding:9px 11px;line-height:1.8;}
+
+/* ── FP PANELS ───────────────────────────────────────────── */
+.fp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.fp-card{background:var(--s2);border:1px solid var(--bd);border-left:3px solid var(--am);border-radius:var(--r);padding:9px;}
+.fp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.fp-t{font-weight:700;font-size:12px;}
+.fp-sels{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px;}
+.fp-br{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
+.fp-l{font-family:var(--f-mono);font-size:9.5px;color:var(--tx3);width:28px;}
+.fp-tr{flex:1;height:3px;background:var(--bd);border-radius:2px;overflow:hidden;}
+.fp-fi{height:100%;background:var(--gr);border-radius:2px;transition:width .4s;}
+.fp-v{font-family:var(--f-mono);font-size:9.5px;color:var(--tx3);min-width:44px;text-align:right;}
+
+/* ── DERECHA: LEDs ───────────────────────────────────────── */
+.led-grid{display:flex;flex-direction:column;gap:5px;}
+.led-row{
+  display:flex;align-items:center;gap:3px;
+  padding:5px 6px;border-radius:var(--rsm);
+  background:var(--s2);border:1px solid var(--bd);
+  transition:border-color .2s,background .2s;min-width:0;
+}
+/* Toggle encendido → borde del color del LED */
+.led-row.on{background:rgba(var(--led-rgb,240,165,0),.05);border-color:rgba(var(--led-rgb,240,165,0),.4);}
+.led-name-box{display:flex;align-items:center;gap:4px;width:55px;flex-shrink:0;}
+.led-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.led-name{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--tx2);}
+.led-ctrls{display:flex;align-items:center;gap:0;margin-left:auto;}
+/* Input LED: flex:1 para que ocupe el espacio disponible */
+.led-inp{
+  background:var(--s2);border:1px solid var(--bd2);color:var(--tx);
+  border-radius:0;border-left:none;border-right:none;
+  padding:3px 2px;
+  font-family:var(--f-mono);
+  font-size:10px;width:34px;text-align:center;
+  outline:none;color-scheme:dark;
+  transition:border-color .15s;
+  /* Ocultar spinner nativo — usamos botones +/- propios */
+  -moz-appearance:textfield;
+}
+.led-inp::-webkit-inner-spin-button,
+.led-inp::-webkit-outer-spin-button { display:none; }
+.led-inp:focus{border-color:var(--gr);}
+.led-set-btn{margin-right:2px;}
+.led-val{font-family:var(--f-mono);font-size:10.5px;color:var(--tx3);width:28px;text-align:right;flex-shrink:0;}
+
+/* ── DERECHA: BOMBAS ─────────────────────────────────────── */
+.pump-grid{display:flex;flex-direction:column;gap:5px;}
+.pump-row{padding:7px 9px;border-radius:var(--rsm);background:var(--s2);border:1px solid var(--bd);transition:all .25s;}
+/* Bomba encendida → azul */
+.pump-row.on{border-color:rgba(74,158,255,.5);background:rgba(74,158,255,.07);box-shadow:0 0 8px rgba(74,158,255,.15);}
+.pump-hdr{display:flex;align-items:center;gap:5px;margin-bottom:4px;}
+.pump-nm{font-size:11px;font-weight:700;color:var(--tx2);flex:1;}
+.pump-vl{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
+.pump-tr{height:3px;background:var(--bd);border-radius:2px;margin-bottom:4px;overflow:hidden;}
+.pump-fi{height:100%;background:var(--bl);border-radius:2px;transition:width .4s;}
+.pump-ct{display:flex;gap:3px;min-width:0;}
+.pump-ct .field{flex:1;min-width:0;}
+
+/* ── ESPECTRÓMETRO ───────────────────────────────────────── */
+.spec-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;}
+.spec-tile{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);padding:5px 7px;}
+.spec-tile .val{font-family:var(--f-mono);font-size:11px;font-weight:500;color:var(--tx);}
+.spec-tile .sub{font-size:9px;color:var(--tx3);margin-top:1px;font-weight:700;}
+
+/* ── RIPPLE EFFECT ───────────────────────────────────────── */
+.btn, .ib, .mb, .dev-btn, .mob-tab {
+  position: relative;
+  overflow: hidden;
+}
+.ripple-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,.35);
+  transform: scale(0);
+  animation: rippleExpand .5s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes rippleExpand {
+  to { transform: scale(4); opacity: 0; }
+}
+/* Glow pulsante para botón Run FSM cuando está activo */
+#CustomSwitch.on-pu {
+  animation: fsmGlowPulse 1.6s ease-in-out infinite;
+}
+@keyframes fsmGlowPulse {
+  0%,100% { box-shadow: 0 0 8px rgba(167,139,250,.4); }
+  50%     { box-shadow: 0 0 22px rgba(167,139,250,.75), 0 0 40px rgba(167,139,250,.3); }
+}
+/* Glow en botones Iniciar y Detener cuando se usa */
+.btn-go { position:relative; overflow:hidden; }
+.btn-go .ripple-circle { background:rgba(0,0,0,.2); }
+.btn-stop .ripple-circle { background:rgba(255,255,255,.2); }
+/* LED toggle glow on hover */
+.tog:hover .tog-t { box-shadow: 0 0 10px rgba(var(--led-rgb,0,214,143),.3); }
+
+/* ── TOAST MANAGER PREMIUM ──────────────────────────────── */
+#toasts {
+  position:fixed; bottom:14px; right:14px; z-index:9999;
+  display:flex; flex-direction:column-reverse; gap:8px;
+  pointer-events:none; max-width:380px;
+}
+.toast {
+  pointer-events:auto;
+  padding:0; border-radius:var(--r); font-size:12px;
+  border:1px solid; max-width:380px; min-width:280px;
+  background:var(--s1); overflow:hidden;
+  animation: toastIn .35s cubic-bezier(.16,1,.3,1);
+  box-shadow: 0 8px 32px rgba(0,0,0,.4);
+  position:relative;
+}
+.toast.removing {
+  animation: toastOut .3s ease forwards;
+}
+.toast-body {
+  display:flex; align-items:flex-start; gap:9px;
+  padding:11px 14px;
+}
+.toast-icon {
+  width:28px; height:28px; border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0;
+}
+.toast-text { flex:1; min-width:0; }
+.toast-title {
+  font-weight:800; font-size:12px; margin-bottom:2px;
+  line-height:1.3;
+}
+.toast-msg {
+  font-size:11px; font-weight:500; opacity:.7;
+  line-height:1.4;
+}
+.toast-close {
+  background:none; border:none; color:inherit; opacity:.4;
+  cursor:pointer; font-size:14px; padding:4px;
+  transition:opacity .15s; flex-shrink:0;
+}
+.toast-close:hover { opacity:1; }
+/* Barra de progreso en el fondo */
+.toast-progress {
+  height:3px; background:rgba(255,255,255,.08);
+  position:relative; overflow:hidden;
+}
+.toast-progress-fill {
+  height:100%; position:absolute; left:0; top:0;
+  border-radius:0 2px 2px 0;
+  animation: toastCountdown var(--toast-dur, 4s) linear forwards;
+}
+@keyframes toastCountdown { from{width:100%} to{width:0%} }
+/* Variantes */
+.toast.t-ok   { border-color:rgba(0,214,143,.35); color:var(--gr); }
+.toast.t-ok   .toast-icon { background:var(--gr-d); color:var(--gr); }
+.toast.t-ok   .toast-progress-fill { background:var(--gr); }
+.toast.t-err  { border-color:rgba(224,85,85,.35); color:var(--rd); }
+.toast.t-err  .toast-icon { background:var(--rd-d); color:var(--rd); }
+.toast.t-err  .toast-progress-fill { background:var(--rd); }
+.toast.t-warn { border-color:rgba(240,165,0,.35); color:var(--am); }
+.toast.t-warn .toast-icon { background:var(--am-d); color:var(--am); }
+.toast.t-warn .toast-progress-fill { background:var(--am); }
+.toast.t-info { border-color:rgba(74,158,255,.35); color:var(--bl); }
+.toast.t-info .toast-icon { background:var(--bl-d); color:var(--bl); }
+.toast.t-info .toast-progress-fill { background:var(--bl); }
+@keyframes toastIn  { from{opacity:0;transform:translateX(30px) scale(.92)} to{opacity:1;transform:none} }
+@keyframes toastOut { from{opacity:1;transform:none} to{opacity:0;transform:translateX(20px) scale(.95)} }
+
+/* ── CSV EXPORT BUTTON ──────────────────────────────────── */
+.btn-csv {
+  padding:3px 9px; border-radius:var(--rsm);
+  background:var(--s2); border:1px solid var(--bd2);
+  color:var(--tx3); font-family:var(--f-ui); font-size:10px; font-weight:700;
+  cursor:pointer; transition:all .15s;
+  display:inline-flex; align-items:center; gap:4px;
+  position:relative; overflow:hidden;
+}
+.btn-csv:hover { color:var(--gr); border-color:var(--gr); background:var(--gr-d); }
+.btn-csv i { font-size:11px; }
+
+/* ── GUIDED TOUR ─────────────────────────────────────────── */
+#main-tour-overlay{position:fixed;inset:0;z-index:8000;display:none;pointer-events:none;}
+#main-tour-overlay.active{display:block;}
+#main-tour-highlight{
+  position:fixed;z-index:8002;border-radius:10px;
+  border:2px solid var(--gr);
+  box-shadow:0 0 0 9999px rgba(0,0,0,.68), 0 0 20px 2px rgba(0,214,143,.2);
+  transition:left .3s cubic-bezier(.4,0,.2,1),top .3s cubic-bezier(.4,0,.2,1),
+             width .3s cubic-bezier(.4,0,.2,1),height .3s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;background:transparent;
+}
+#main-tour-backdrop{position:fixed;inset:0;z-index:8001;background:transparent;pointer-events:all;cursor:default;}
+#main-tour-box{
+  position:fixed;z-index:8004;
+  background:var(--s1);border:1px solid var(--gr);border-radius:12px;
+  padding:18px 20px;width:330px;
+  box-shadow:0 8px 32px rgba(0,0,0,.35);
+  transition:left .3s cubic-bezier(.4,0,.2,1),top .3s cubic-bezier(.4,0,.2,1);
+  pointer-events:all;
+}
+#main-tour-box h4{font-family:var(--f-disp);font-size:18px;color:var(--gr);margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+#main-tour-box p{font-size:12px;color:var(--tx2);line-height:1.7;margin-bottom:16px;}
+.main-tour-footer{display:flex;align-items:center;gap:6px;}
+.main-tour-nav{display:flex;gap:5px;margin-left:auto;}
+.main-tour-skip{font-size:11px;color:var(--tx3);background:none;border:none;cursor:pointer;padding:2px 6px;font-family:var(--f-ui);transition:color .15s;border-radius:4px;}
+.main-tour-skip:hover{color:var(--tx);background:var(--s3);}
+#main-tour-btn-prev{opacity:0.6;}
+.main-tour-count{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
+
+/* ── NEXUS NAV TABS ─────────────────────────────────────── */
+.nexus-tabs{
+  display:flex;align-items:center;gap:2px;
+  background:var(--s2);border:1px solid var(--bd);
+  border-radius:var(--rsm);padding:2px;flex-shrink:0;
+}
+.nexus-tab{
+  padding:4px 14px;border-radius:4px;border:none;
+  background:transparent;color:var(--tx3);
+  font-family:var(--f-ui);font-size:11px;font-weight:700;
+  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;
+  white-space:nowrap;
+}
+.nexus-tab:hover{color:var(--tx2);background:var(--s3);}
+.nexus-tab.active{background:var(--gr-d);color:var(--gr);border:1px solid var(--gr);}
+.nexus-tab.active i{color:var(--gr);}
+
+/* Paneles de contenido del Nexus */
+#nexus-main{display:block;}
+#nexus-architect{display:none;position:fixed;top:var(--topbar-h);left:0;right:0;bottom:0;z-index:200;}
+#nexus-camera{display:none;position:fixed;top:var(--topbar-h);left:0;right:0;bottom:0;z-index:200;background:#000;}
+#nexus-architect iframe{width:100%;height:100%;border:none;}
+
+/* ── Camera Panel Layout ────────────────────────────────── */
+#cam-inner{position:absolute;inset:0;display:flex;}
+#cam-video-area{
+  flex:1;min-width:0;background:#000;position:relative;overflow:hidden;
+}
+#cam-feed{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
+#cam-offline-badge{
+  position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:10px;
+  color:var(--tx3);font-size:13px;pointer-events:none;
+}
+#cam-offline-badge i{font-size:32px;opacity:.4;}
+#cam-sidebar{
+  width:220px;flex-shrink:0;background:var(--s1);border-left:1px solid var(--bd);
+  padding:14px 12px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;
+}
+.cam-sidebar-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--tx2);padding-bottom:8px;border-bottom:1px solid var(--bd);
+}
+.cam-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s;}
+.cam-dot.online{background:var(--gr);box-shadow:0 0 6px rgba(0,214,143,.5);}
+.cam-dot.offline{background:#ef4444;}
+.cam-dot.unknown{background:var(--tx3);}
+.cam-ctrl{display:flex;flex-direction:column;gap:5px;}
+.cam-ctrl-label{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:11px;color:var(--tx2);
+}
+.cam-ctrl-label span:last-child{font-family:var(--f-mono);color:var(--tx);font-size:10px;}
+.cam-ctrl input[type=range]{
+  width:100%;accent-color:var(--gr);
+  height:4px;cursor:pointer;border-radius:2px;
+}
+.cam-info-row{
+  display:flex;justify-content:space-between;align-items:center;font-size:11px;
+}
+.cam-info-label{color:var(--tx3);}
+.cam-info-val{font-family:var(--f-mono);color:var(--tx);font-size:10.5px;}
+.cam-exp-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+}
+.cam-exp-badge.running{background:rgba(0,214,143,.15);color:var(--gr);}
+.cam-exp-badge.stopped{background:rgba(239,68,68,.1);color:#ef4444;}
+
+/* ── Camera rotation hint (mobile portrait) ─────────────── */
+#cam-rotate-hint{
+  position:absolute;inset:0;background:var(--bg);
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:28px;z-index:20;
+}
+#cam-rotate-hint.active{display:flex;}
+.rotate-icon-wrap{
+  width:90px;height:90px;display:flex;align-items:center;justify-content:center;
+  border:2px solid rgba(0,214,143,.3);border-radius:50%;
+  background:var(--gr-d);
+}
+.rotate-icon-wrap i{
+  font-size:54px;color:var(--gr);
+  animation:camPhoneRotate 2.4s ease-in-out infinite;
+  transform-origin:center;
+}
+@keyframes camPhoneRotate{
+  0%  {transform:rotate(0deg);}
+  35% {transform:rotate(-90deg);}
+  65% {transform:rotate(-90deg);}
+  100%{transform:rotate(0deg);}
+}
+#cam-rotate-hint p{
+  font-size:14px;color:var(--tx2);text-align:center;
+  line-height:1.7;font-family:var(--f-ui);font-weight:600;max-width:220px;
+}
+#cam-rotate-hint strong{color:var(--gr);}
+
+/* ── Mobile landscape camera adjustments ────────────────── */
+@media(max-width:900px) and (orientation:landscape) and (max-height:500px){
+  #cam-sidebar{width:190px;padding:8px 10px;gap:8px;font-size:12px;}
+  .cam-sidebar-hdr{font-size:9.5px;padding-bottom:6px;}
+  .cam-ctrl-label{font-size:10px;}
+  .cam-ctrl input[type=range]{height:3px;}
+  .cam-info-row{font-size:10px;}
+  .cam-sidebar-hdr+.cam-ctrl{margin-top:0;}
+}
+
+/* ── MOBILE TWEAKS ──────────────────────────────────────────── */
+#mob-tabs{display:none;}
+
+@media(max-width:768px){
+  :root{ --mob-tab-h:54px; }
+
+  /* Rediseño TOPBAR Móvil (Menú desplegable) */
+  #topbar{padding:0 10px;justify-content:flex-start;}
+  .logo{flex:1;}
+  .desktop-hidden{display:flex;}
+  .mobile-hidden{display:none !important;}
+  .mob-menu-btn{
+    display:flex;align-items:center;justify-content:center;
+    background:transparent;border:1px solid var(--bd2);color:var(--tx2);
+    border-radius:var(--rsm);width:32px;height:32px;font-size:14px;cursor:pointer;
+    transition:all .2s;
+  }
+  .mob-menu-btn.active{background:var(--s3);color:var(--tx);border-color:var(--tx3);}
+  
+  .tb-content{
+    display:none;position:absolute;top:54px;right:8px;width:220px;
+    background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);
+    padding:12px;flex-direction:column;gap:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.7);z-index:1000;
+  }
+  .tb-content.open{display:flex;}
+  .tb-sep{display:none;}
+  .tb-content .dev-row{flex-wrap:wrap;justify-content:center;}
+  .tb-content .tb-r{flex-direction:column;margin:0;width:100%;align-items:stretch;gap:8px;}
+  .tb-content .tb-r .btn{justify-content:center;width:100%;}
+  #StartTime,#cyc{text-align:center;}
+  .cpill{justify-content:center;}
+
+  /* Estructura Page / Tabs en Móvil */
+  #page{display:block;grid-template-columns:none;bottom:var(--mob-tab-h);}
+  .col-l,.col-c,.col-r{padding:0;border:none;height:0;overflow:visible;display:block;}
+  
+  .tab-container{
+    position:absolute;top:0;left:0;right:0;bottom:0;padding:9px;
+    overflow-y:auto;overflow-x:hidden;display:none;
+  }
+  .tab-container.mob-active{display:flex !important;}
+
+  /* Específico: En movil las graficas no pueden ser grid 2x2 */
+  .charts4{display:flex !important;flex-direction:column;height:auto;gap:10px;min-height:0;}
+  .cbox{height:250px;flex-shrink:0;}
+
+  /* Fluorescencia en móvil debe ser en columna (vertical) */
+  .fp-grid{display:flex !important; flex-direction:column !important; gap:8px;}
+
+  /* Restablecer LED Grid a compacto en móvil */
+  .led-grid{gap:5px; flex:none; justify-content:flex-start;}
+
+  /* Acomodar los CTABS de terminal/fluorescencia para no desbordar */
+  .ctabs{flex-wrap:wrap;}
+
+  /* Modo visualización — ocultar controles de topbar */
+  #nexus-tab-bar,
+  #ctx-main,
+  #ctx-architect,
+  #global-buttons,
+  #mob-menu-btn { display: none !important; }
+
+  /* Panel cámara no se solapa con la barra inferior */
+  #nexus-camera { bottom: var(--mob-tab-h) !important; }
+
+  /* Tab bar fijo inferior — z-index alto para superar el iframe de cámara */
+  #mob-tabs{
+    display:flex;position:fixed;bottom:0;left:0;right:0;
+    height:var(--mob-tab-h);background:var(--s1);border-top:1px solid var(--bd);z-index:9000;
+  }
+  .mob-tab{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;background:transparent;border:none;color:var(--tx3);font-family:var(--f-ui);
+    font-size:9.5px;font-weight:700;cursor:pointer;transition:all .15s;padding:0;
+  }
+  .mob-tab i{font-size:16px;}
+  .mob-tab.active{color:var(--gr);}
+  .mob-tab.active i{text-shadow:0 0 10px rgba(0,214,143,.5);}
+}
+
+/* ── ESTILOS HEREDADOS DEL ARCHITECT ── */
+.btn-arch-accent { background: #00e5a0 !important; color: #000 !important; border: none !important; font-weight: 700 !important; box-shadow: 0 0 10px rgba(0,229,160,0.2); }
+.btn-arch-accent:hover { filter: brightness(1.1); }
+.btn-arch-cloud { background: #6366f1 !important; color: #fff !important; border: none !important; font-weight: 700 !important; }
+.btn-arch-cloud:hover { background: #4f46e5 !important; }
+.btn-arch-cloud:disabled { background: var(--s3) !important; color: var(--tx3) !important; opacity: 0.5; cursor: not-allowed; box-shadow: none !important; }
+
+.arch-safety { border-color: #ef4444 !important; color: #94a3b8 !important; }
+.arch-safety .sdot { background: #ef4444 !important; box-shadow: none !important; animation: none !important; }
+.arch-safety.on { border-color: #00e5a0 !important; color: #00e5a0 !important; background: rgba(0,229,160,0.1) !important; }
+.arch-safety.on .sdot { background: #00e5a0 !important; box-shadow: 0 0 5px #00e5a0 !important; }
+
+/* ── Architect Tour — topbar cross-frame overlay ──────────── */
+#topbar.tour-dim::after{
+  content:'';position:absolute;inset:0;
+  background:rgba(0,0,0,.72);pointer-events:none;z-index:9999;
+}
+#nexus-tour-highlight{
+  position:fixed;z-index:10000;border-radius:10px;
+  border:2px solid var(--gr);
+  box-shadow:0 0 20px 2px rgba(0,214,143,.25);
+  pointer-events:none;display:none;background:transparent;
+  transition:left .32s cubic-bezier(.4,0,.2,1),top .32s cubic-bezier(.4,0,.2,1),
+             width .32s cubic-bezier(.4,0,.2,1),height .32s cubic-bezier(.4,0,.2,1);
+}
+#nexus-tour-highlight.vis{display:block;}
+#nexus-topbar-dim-left,#nexus-topbar-dim-right{
+  position:fixed;top:0;z-index:9999;
+  background:rgba(0,0,0,.72);pointer-events:none;display:none;
+}
+#nexus-topbar-dim-left{left:0;}
+#nexus-topbar-dim-left.vis,#nexus-topbar-dim-right.vis{display:block;}
+

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chi.Bio Master Architect V1.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne+Mono&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/architect.css') }}">
+</head>
+<body data-theme="dark">
+
+<!-- ══ TOPBAR ══════════════════════════════════════════════ -->
+<div class="topbar">
+  <button class="btn btn-ghost" onclick="openPumpModal()" data-tip="Calibra el caudal real (ml/min) de cada bomba para calcular volúmenes precisos">
+    <i class="fa-solid fa-faucet-drip" style="color:#3b82f6"></i> Caudales Globales
+  </button>
+  <div class="sep"></div>
+  <span class="tb-lbl">Reactor:</span>
+  <select class="tb-sel" id="dev-sel">
+    <option>M0</option><option selected>M1</option><option>M2</option>
+    <option>M3</option><option>M4</option><option>M5</option><option>M6</option><option>M7</option>
+  </select>
+  <div class="sep"></div>
+  <span class="tb-lbl">Destino:</span>
+  <select class="tb-sel" id="prog-sel">
+    <option value="C1">C1</option><option value="C2">C2</option><option value="C3">C3</option>
+    <option value="C4">C4</option><option value="C5">C5</option><option value="C6">C6</option>
+    <option value="C7">C7</option><option value="C8" selected>C8 (Recomendado)</option>
+  </select>
+  <div class="sep"></div>
+  <div class="safety-badge" id="safety-badge" onclick="openSafety()" data-tip="Checklist de seguridad físico. Debes confirmarlo antes de compilar protocolos con temperatura u óptica.">
+    <div class="safety-dot"></div>
+    <span><i class="fa-solid fa-lock" style="font-size:9px;margin-right:2px"></i>Seguridad</span>
+  </div>
+  <div class="tb-right">
+    <div class="io-btns">
+      <button class="btn btn-ghost" onclick="exportExperiment()" data-tip="Guarda el experimento como archivo .chibio"><i class="fa-solid fa-file-export" style="color:#10b981"></i> Exportar</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('import-file').click()" data-tip="Carga un archivo .chibio exportado previamente"><i class="fa-solid fa-file-import" style="color:#60a5fa"></i> Importar</button>
+      <input type="file" id="import-file" accept=".chibio,.json" style="display:none" onchange="importExperiment(event)">
+    </div>
+    <div class="sep"></div>
+    <button class="btn btn-ghost" onclick="startTour()" data-tip="Tour interactivo"><i class="fa-solid fa-circle-question" style="color:var(--warn)"></i> Tour</button>
+    <div class="sep"></div>
+    <button class="btn btn-ghost" id="btn-undo" onclick="undo()" disabled data-tip="Deshacer (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+    <button class="btn btn-ghost" id="btn-redo" onclick="redo()" disabled data-tip="Rehacer (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+    <button class="btn btn-ghost" onclick="clearCanvas()"><i class="fa-solid fa-trash-can"></i> Limpiar</button>
+    <button class="btn btn-accent" id="compile-btn" onclick="doCompile()"><i class="fa-solid fa-bolt"></i> Compilar FSM</button>
+    <button class="btn btn-cloud" id="btn-send-cloud" onclick="sendToReactor()" disabled><i class="fa-solid fa-paper-plane"></i> Enviar a Biorreactor</button>
+  </div>
+</div>
+
+<!-- ══ MAIN ════════════════════════════════════════════════ -->
+<div class="main">
+
+<!-- ── PALETTE ──────────────────────────────────── -->
+<div class="palette" id="palette">
+
+  <div class="cat"><i class="fa-solid fa-gear" style="color:var(--text3)"></i>Condiciones Iniciales</div>
+  <div class="pill" draggable="true" data-btype="init_temp" onclick="addBlock('init_temp')" data-tip="Fija la temperatura objetivo del termostato al inicio del experimento. Solo puede usarse una vez. Rango: 0–50°C." >
+    <div class="pi" style="background:rgba(239,68,68,.12);color:#ef4444"><i class="fa-solid fa-temperature-half"></i></div>
+    <div><div class="pn">Temperatura inicial</div><div class="pd">Setpoint del termostato</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="init_od" onclick="addBlock('init_od')" data-tip="Define el OD (Densidad Óptica) objetivo para el turbidostato. Solo puede usarse una vez. El sensor mide la turbidez del cultivo.">
+    <div class="pi" style="background:rgba(0,229,160,.12);color:#00e5a0"><i class="fa-solid fa-bullseye"></i></div>
+    <div><div class="pn">OD objetivo inicial</div><div class="pd">Setpoint del turbidostato</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="init_stir" onclick="addBlock('init_stir')" data-tip="Activa el agitador magnético al inicio. Valor entre 0 (parado) y 1 (máxima velocidad). 0.5 es la velocidad estándar para cultivos.">
+    <div class="pi" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-fan"></i></div>
+    <div><div class="pn">Agitación inicial</div><div class="pd">Velocidad del agitador</div></div>
+  </div>
+
+  <div class="cat"><i class="fa-solid fa-microchip" style="color:var(--text3)"></i>Hardware</div>
+  <div class="pill" draggable="true" data-btype="thermostat" onclick="addBlock('thermostat')" data-tip="Cambia la temperatura objetivo en cualquier punto del protocolo. Requiere Checklist de Seguridad. Temperatura máxima: 50°C.">
+    <div class="pi" style="background:rgba(239,68,68,.12);color:#ef4444"><i class="fa-solid fa-temperature-full"></i></div>
+    <div><div class="pn">Fijar Termostato</div><div class="pd">Cambio directo (°C)</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="ramp_temp" onclick="addBlock('ramp_temp')" data-tip="Sube o baja la temperatura gradualmente de un valor inicial a uno final en X minutos. Ideal para heat-shock o aclimatación.">
+    <div class="pi" style="background:rgba(244,63,94,.12);color:#f43f5e"><i class="fa-solid fa-arrow-trend-up"></i></div>
+    <div><div class="pn">Rampa Térmica</div><div class="pd">Ajuste gradual progresivo</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="led" onclick="addBlock('led')" data-tip="Controla los LEDs de excitación (457–623nm y 6500K) o el láser 650nm. Modos: encender indefinido, pulso por tiempo, o apagar. Potencia máxima recomendada: 0.5 para no quemar el disipador.">
+    <div class="pi" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-lightbulb"></i></div>
+    <div><div class="pn">Control LED</div><div class="pd">Pulsos o luz continua</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="uv" onclick="addBlock('uv')" data-tip="Activa la luz UV para inducir estrés genotóxico o mutagénesis. Usar con mucho cuidado — potencias altas son irreversibles. Máx recomendado: 0.3 por períodos cortos.">
+    <div class="pi" style="background:rgba(139,92,246,.12);color:#8b5cf6"><i class="fa-solid fa-radiation"></i></div>
+    <div><div class="pn">Luz UV</div><div class="pd">Control de estrés</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="pump" onclick="addBlock('pump')" data-tip="Activa una bomba durante N segundos. Pump1=entrada de medio, Pump2=salida/dilución, Pump3/4=auxiliares. La potencia negativa invierte el flujo. Cuidado con el volumen total.">
+    <div class="pi" style="background:rgba(59,130,246,.12);color:#3b82f6"><i class="fa-solid fa-droplet"></i></div>
+    <div><div class="pn">Dispensar Bomba</div><div class="pd">Inyección temporizada</div></div>
+  </div>
+
+  <div class="cat"><i class="fa-solid fa-sliders" style="color:var(--text3)"></i>Modos de Control</div>
+  <div class="pill" draggable="true" data-btype="turbidostat" onclick="addBlock('turbidostat')" data-tip="Mantiene la densidad celular (OD) constante diluyendo automáticamente el cultivo con medio fresco. Ideal para evolución adaptativa. Solo un modo de control por experimento.">
+    <div class="pi" style="background:rgba(34,211,238,.12);color:#22d3ee"><i class="fa-solid fa-chart-line"></i></div>
+    <div><div class="pn">Turbidostato</div><div class="pd">Regulación automática OD</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="chemostat" onclick="addBlock('chemostat')" data-tip="Mantiene una tasa de dilución constante (flujo de entrada y salida fijo). p1=tasa Pump1 entrada, p2=tasa Pump2 salida. p2 debe ser ligeramente mayor que p1.">
+    <div class="pi" style="background:rgba(236,72,153,.12);color:#ec4899"><i class="fa-solid fa-circle-nodes"></i></div>
+    <div><div class="pn">Quimiostato</div><div class="pd">Flujo continuo de medio</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="zigzag" onclick="addBlock('zigzag')" data-tip="Alterna entre OD alto y bajo para estimar la tasa de crecimiento μ en tiempo real. Zig = amplitud de la oscilación en unidades OD. Activa el turbidostato automáticamente.">
+    <div class="pi" style="background:rgba(245,158,11,.12);color:#f59e0b"><i class="fa-solid fa-wave-square"></i></div>
+    <div><div class="pn">Zigzag</div><div class="pd">Estimar tasa de crecimiento</div></div>
+  </div>
+
+  <div class="cat"><i class="fa-solid fa-eye" style="color:var(--text3)"></i>Sensores</div>
+  <div class="pill" draggable="true" data-btype="measure_od" onclick="addBlock('measure_od')" data-tip="Fuerza una lectura del sensor óptico. Pausa el agitador automáticamente 3 segundos para eliminar el ruido de la turbulencia y obtener una lectura limpia.">
+    <div class="pi" style="background:rgba(0,229,160,.12);color:#00e5a0"><i class="fa-solid fa-microscope"></i></div>
+    <div><div class="pn">Medir OD</div><div class="pd">Forzar lectura óptica</div></div>
+  </div>
+
+  <div class="cat"><i class="fa-solid fa-clock" style="color:var(--text3)"></i>Flujo y Lógica</div>
+  <div class="pill" draggable="true" data-btype="wait" onclick="addBlock('wait')" data-tip="Pausa el protocolo por un tiempo. Minutos=basado en ciclos del FSM (seguro). Segundos=bloqueo real (máx 15s). Generaciones=unidad biológica basada en la tasa de crecimiento.">
+    <div class="pi" style="background:rgba(100,116,139,.12);color:#94a3b8"><i class="fa-solid fa-hourglass-half"></i></div>
+    <div><div class="pn">Esperar (Tiempo)</div><div class="pd">Min, Seg o Generaciones</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="loop" onclick="addBlock('loop')" data-tip="Repite una secuencia de bloques N veces. Puedes anidar cualquier bloque dentro. Ideal para protocolos cíclicos como rondas de selección.">
+    <div class="pi" style="background:rgba(245,158,11,.12);color:#f59e0b"><i class="fa-solid fa-repeat"></i></div>
+    <div><div class="pn">Bucle</div><div class="pd">Repetir N veces</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="trigger" onclick="addBlock('trigger')" data-tip="Ejecuta bloques solo cuando se cumple una condición (OD, temperatura, tasa de crecimiento, fluorescencia). Modo 'esperar' pausa hasta que se cumpla. Modo 'if' lo evalúa instantáneamente.">
+    <div class="pi" style="background:rgba(248,113,113,.12);color:#f87171"><i class="fa-solid fa-bolt"></i></div>
+    <div><div class="pn">Trigger Condicional</div><div class="pd">Reactivo a sensores</div></div>
+  </div>
+  <div class="pill" draggable="true" data-btype="log" onclick="addBlock('log')" data-tip="Imprime un mensaje en la consola del biorreactor durante la ejecución. Útil para marcar etapas del experimento y depurar el protocolo.">
+    <div class="pi" style="background:rgba(16,185,129,.12);color:#10b981"><i class="fa-solid fa-terminal"></i></div>
+    <div><div class="pn">Log en Consola</div><div class="pd">Imprimir mensaje</div></div>
+  </div>
+</div>
+
+<!-- ── CANVAS ────────────────────────────────────── -->
+<div class="canvas-panel">
+  <div class="canvas-hdr">
+    <div class="canvas-ttl"><i class="fa-solid fa-layer-group" style="color:var(--accent);margin-right:5px"></i>Protocolo Experimental</div>
+    <span class="cbadge" id="blk-count">0 bloques</span>
+    <span class="cbadge" id="dev-badge">M1</span>
+  </div>
+  <div id="canvas-warn-banner">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+    <span><strong>OD objetivo definido sin modo de control.</strong> Agrega Turbidostato, Quimiostato o Zigzag para que el objetivo tenga efecto. (Solo informativo)</span>
+  </div>
+  <div class="canvas-body" id="canvas"
+    ondragover="canvasDragOver(event)"
+    ondrop="canvasDrop(event)"
+    ondragleave="canvasDragLeave(event)">
+    <div class="c-empty" id="c-empty">
+      <i class="fa-solid fa-flask-vial"></i>
+      <h3>Canvas Vacío</h3>
+      <p>Arrastra bloques desde la izquierda o haz clic en ellos.</p>
+    </div>
+    <div class="dropzone" id="dropzone">↓ Soltar aquí</div>
+  </div>
+  
+  <!-- ── AI COMMAND BAR ────────────────────────────────────── -->
+  <div class="ai-bar" id="ai-bar">
+    <i class="fa-solid fa-wand-magic-sparkles ai-icon"></i>
+    <input type="text" id="ai-prompt-input" class="ai-input" placeholder="Ej: Calienta a 37°C, espera 10 min y haz un pulso de luz azul al 20%..." onkeypress="handleAIKeyPress(event)">
+    <button class="btn btn-accent" onclick="triggerAIGeneration()" id="ai-btn" data-tip="Generar bloques usando Inteligencia Artificial">
+      <i class="fa-solid fa-robot"></i> Generar
+    </button>
+  </div>
+
+  <div class="vol-bar-outer">
+    <span class="vbl"><i class="fa-solid fa-droplet"></i> Vol. neto estimado:</span>
+    <div class="vbw"><div class="vbi" id="vol-bar" style="width:0%"></div></div>
+    <span class="vbv" id="vol-val">0.0 / 25 ml</span>
+  </div>
+</div>
+
+<!-- ── RIGHT PANEL ───────────────────────────────── -->
+<div class="rpanel">
+  <div class="rtabs">
+    <button class="rtab on" id="rtab-console" onclick="switchTab('console')">
+      <i class="fa-solid fa-triangle-exclamation"></i> Consola
+    </button>
+    <button class="rtab" id="rtab-code" onclick="switchTab('code')">
+      <i class="fa-solid fa-code"></i> Python FSM
+    </button>
+  </div>
+  <div class="rcontent">
+    <div class="rpane on" id="rpane-console">
+      <div class="console-wrap" id="console-wrap">
+        <div class="console-empty-msg">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Motor M.E. y Validador Semántico listos.<br>Presiona Compilar.</span>
+        </div>
+      </div>
+    </div>
+    <div class="rpane" id="rpane-code">
+      <div class="code-bar">
+        <span id="code-status">Sin compilar</span>
+        <button class="btn btn-ghost" style="font-size:11px;padding:3px 7px" onclick="copyCode()">
+          <i class="fa-regular fa-copy"></i> Copiar
+        </button>
+      </div>
+      <pre id="gen-code"><span class="py-cm"># Construye tu protocolo en el canvas para generar código Python estructurado.</span></pre>
+    </div>
+  </div>
+</div>
+</div><!-- /main -->
+
+<div id="toasts"></div>
+
+<!-- ══ TOUR OVERLAY ══════════════════════════════════════════ -->
+<div id="tour-overlay">
+  <div id="tour-backdrop"></div>
+  <div id="tour-highlight"></div>
+  <div id="tour-box">
+    <h4><i class="fa-solid fa-circle-play" style="flex-shrink:0"></i> <span id="tour-title"></span></h4>
+    <p id="tour-desc"></p>
+    <div class="tour-footer">
+      <span id="tour-step-count" style="font-size:11px;color:var(--text3);font-family:var(--mono)"></span>
+      <button class="tour-skip" onclick="endTour()">✕ Saltar</button>
+      <div class="tour-nav">
+        <button class="btn btn-ghost" id="tour-btn-prev" onclick="tourPrev()" style="font-size:11px;padding:4px 9px">← Atrás</button>
+        <button class="btn btn-accent" id="tour-btn-next" onclick="tourNext()" style="font-size:11px;padding:4px 9px">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modal: Block picker -->
+<div class="moverlay" id="modal-picker" onclick="closePicker(event)">
+  <div class="mbox">
+    <h3><i class="fa-solid fa-plus" style="color:var(--accent);margin-right:5px"></i>Añadir bloque interno</h3>
+    <div id="picker-list"></div>
+    <div class="mfooter"><button class="btn btn-ghost" onclick="closePickerBtn()">Cancelar</button></div>
+  </div>
+</div>
+
+
+
+<!-- Modal: Cloud Config -->
+<div class="moverlay" id="modal-cloud" onclick="if(event.target===this) this.classList.remove('open')">
+  <div class="mbox">
+    <h3><i class="fa-solid fa-cloud" style="color:#6366f1;margin-right:5px"></i>Estado del Sistema</h3>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+      La comunicación con el biorreactor y el asistente de IA se realiza directamente a través del servidor Chi.Bio Nexus.
+    </p>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <div class="frow"><span class="flbl">Servidor</span><span class="finp" style="background:var(--surface);cursor:default;">chibio.primbiolab.org</span></div>
+    </div>
+    <div class="mfooter">
+      <button class="btn btn-accent" onclick="document.getElementById('modal-cloud').classList.remove('open')"><i class="fa-solid fa-check"></i> Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Safety -->
+<div class="moverlay" id="modal-safety" onclick="closeSafety(event)">
+  <div class="mbox">
+    <h3><i class="fa-solid fa-shield-halved" style="color:var(--warn);margin-right:5px"></i>Checklist de Seguridad</h3>
+    <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
+      Confirma las siguientes condiciones físicas del biorreactor antes de permitir la ejecución del protocolo.
+    </p>
+    <div class="cstep" id="cs1" onclick="toggleCS(1)">
+      <div class="ccheck" id="cc1"></div>
+      <div class="cstep-txt"><strong>Tubo insertado</strong><br>El tubo de vidrio con líquido está introducido hasta la base térmica.</div>
+    </div>
+    <div class="cstep" id="cs2" onclick="toggleCS(2)">
+      <div class="ccheck" id="cc2"></div>
+      <div class="cstep-txt"><strong>Anti-Inundación</strong><br>El reactor está posicionado a mayor altura que los frascos de medio y desecho.</div>
+    </div>
+    <div class="cstep" id="cs3" onclick="toggleCS(3)" style="display:none;">
+      <div class="ccheck" id="cc3"></div>
+      <div class="cstep-txt"><strong>Calibración Óptica (OD Zero)</strong><br>Se ha realizado la calibración del sensor con medio limpio en la interfaz web original.</div>
+    </div>
+    <div class="mfooter">
+      <button class="btn btn-ghost" onclick="closeSafetyBtn(false)">Cancelar</button>
+      <button class="btn btn-accent" id="safety-ok-btn" onclick="closeSafetyBtn(true)" disabled>
+        <i class="fa-solid fa-check"></i> Confirmar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/architect.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Chi.Bio Nexus — Servidor de cámara (Windows)
+# Instalar con: pip install -r requirements-camera.txt
+
+flask
+flask-cors
+numpy
+opencv-python
