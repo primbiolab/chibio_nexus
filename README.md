@@ -26,8 +26,8 @@ Prueba la interfaz completa en cualquier PC, sin BeagleBone ni dispositivo Chi.B
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/primbiolab/chibio-nexus
-cd chibio-nexus
+git clone https://github.com/primbiolab/chibio_nexus
+cd chibio_nexus
 
 # 2. Instalar dependencias
 pip install -r requirements-dev.txt
@@ -55,7 +55,7 @@ Ve a [aistudio.google.com/apikey](https://aistudio.google.com/apikey) y crea una
 #### 2. Copiar el proyecto a la BeagleBone
 
 ```bash
-scp -r chibio-nexus/ root@192.168.7.2:/root/chibio/
+scp -r chibio_nexus/ root@192.168.7.2:/root/chibio/
 ```
 
 #### 3. Instalar y configurar (en la BeagleBone, via PuTTY)
@@ -105,7 +105,7 @@ Para acceso remoto, configura un túnel Cloudflare apuntando a `localhost:5001`.
 ## Estructura del proyecto
 
 ```
-chibio-nexus/
+chibio_nexus/
 ├── app.py                    ← Servidor Flask (BeagleBone)
 ├── mock_server.py            ← Servidor simulado (demo sin hardware)
 ├── lanzador_dev.py           ← Lanzador del simulador
