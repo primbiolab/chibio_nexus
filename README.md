@@ -91,14 +91,44 @@ http://192.168.7.2:5000
 
 ### Servidor de cámara (opcional, Windows)
 
-El servidor de cámara corre en el PC Windows por separado en el puerto 5001.
+Chi.Bio Nexus puede mostrar un stream de video en vivo del biorreactor. Esto requiere una cámara conectada al PC Windows (no a la BeagleBone) y un servidor independiente que transmite el video.
+
+#### ¿Por qué corre en el PC y no en la BeagleBone?
+
+La BeagleBone Black no tiene la potencia de procesamiento suficiente para capturar y transmitir video en tiempo real. Por eso el servidor de cámara corre en el mismo PC desde el que controlas el sistema.
+
+#### Configuración
+
+**1. Conectar una cámara USB** al PC Windows.
+
+**2. Instalar dependencias:**
 
 ```bash
 pip install -r requirements-camera.txt
+```
+
+**3. Iniciar el servidor de cámara:**
+
+```powershell
 .\scripts\lanzador_camara.ps1
 ```
 
-Para acceso remoto, configura un túnel Cloudflare apuntando a `localhost:5001`.
+El servidor queda corriendo en `http://localhost:5001`. La interfaz Nexus lo detecta automáticamente si está activo.
+
+#### Acceso remoto a la cámara
+
+Por defecto, el stream de cámara solo es accesible desde tu red local. Si quieres verlo desde cualquier lugar (acceso remoto), necesitas exponer ese puerto a internet de forma segura.
+
+La solución recomendada es **Cloudflare Tunnel**, una herramienta gratuita que crea una URL pública (`https://...`) que apunta a tu servidor local sin necesidad de abrir puertos en el router.
+
+1. Descarga `cloudflared` desde [developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+2. Ejecuta en la terminal:
+   ```bash
+   cloudflared tunnel --url http://localhost:5001
+   ```
+3. Cloudflare te dará una URL pública temporal. Úsala en la configuración de cámara dentro de Nexus.
+
+> Para una URL fija y permanente (no temporal), se puede configurar un túnel nombrado en Cloudflare. Consulta la [documentación oficial](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/).
 
 ---
 
