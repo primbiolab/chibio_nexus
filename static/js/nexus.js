@@ -391,7 +391,7 @@ function _drawAllCharts(data){
   if(_visibleCharts.temp)
     drawChart2(4,4,t,data.ThermometerIR.record+'',data.Thermostat.record+'',data.ThermometerInternal.record+'',data.ThermometerExternal.record+'','','','Time (h)','°C','IR,Target,Int,Ext');
   if(_visibleCharts.pumps)
-    drawChart2(1,1,t,data.Pump1.record+'','','','','','','Time (h)','Flujo','P1');
+    drawChart2(4,1,t,data.Pump1.record+'',data.Pump2.record+'',data.Pump3.record+'',data.Pump4.record+'','','','Time (h)','Flujo','P1,P2,P3,P4');
   var e1b=$('#FPEmit1B').val(),e2b=$('#FPEmit2B').val(),e3b=$('#FPEmit3B').val();
   if(e1b==='OFF')drawChart2(1,5,t,data.FP1.Emit1Record+'','','','','','','Time (h)','FP1','Em1');
   else drawChart2(2,5,t,data.FP1.Emit1Record+'',data.FP1.Emit2Record+'','','','','','Time (h)','FP1','Em1,Em2');
