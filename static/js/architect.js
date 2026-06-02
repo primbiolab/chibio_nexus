@@ -12,6 +12,7 @@ let dragFromPalette = null;
 let dragFromCanvas  = null;   
 
 let globalPumps = { Pump1: 1.0, Pump2: 1.0, Pump3: 1.0, Pump4: 1.0 };
+let globalInitVol = 7.0;
 let rawPythonCode = "";
 
 const META = {
@@ -41,6 +42,7 @@ function openPumpModal() {
     document.getElementById('p_rate2').value = globalPumps.Pump2;
     document.getElementById('p_rate3').value = globalPumps.Pump3;
     document.getElementById('p_rate4').value = globalPumps.Pump4;
+    document.getElementById('p_init_vol').value = globalInitVol;
     document.getElementById('modal-pump').classList.add('open');
 }
 function closePumpModal(e){ if(e.target===document.getElementById('modal-pump')) document.getElementById('modal-pump').classList.remove('open'); }
@@ -49,8 +51,9 @@ function savePumpModal() {
     globalPumps.Pump2 = parseFloat(document.getElementById('p_rate2').value) || 1.0;
     globalPumps.Pump3 = parseFloat(document.getElementById('p_rate3').value) || 1.0;
     globalPumps.Pump4 = parseFloat(document.getElementById('p_rate4').value) || 1.0;
+    globalInitVol = Math.min(25, Math.max(0, parseFloat(document.getElementById('p_init_vol').value) || 0));
     document.getElementById('modal-pump').classList.remove('open');
-    refresh(); toast('Caudales globales actualizados', 'ok');
+    refresh(); toast('Caudales y volumen inicial actualizados', 'ok');
 }
 
 // Cloud config — ahora solo abre el modal informativo
@@ -106,7 +109,7 @@ function checkSafetyRequirements() {
 document.getElementById('dev-sel').addEventListener('change', function(){ document.getElementById('dev-badge').textContent = this.value; });
 document.getElementById('dev-badge').textContent = document.getElementById('dev-sel').value;
 function getM(){ return document.getElementById('dev-sel').value; }
-function getProg(){ return document.getElementById('prog-sel').value; }
+function getProg(){ return 'C8'; }
 
 // ── Node factory ──────────────────────────────────────────
 function uid(){ return 'n'+(++nodeCounter); }
@@ -120,7 +123,7 @@ function mkNode(type){
     case 'ramp_temp':   return {...b, temp_start:37.0, temp_end:42.0, duration:60};
     case 'led':         return {...b, led:'LEDB', power:0.1, mode:'on', duration:1, unit:'min'};
     case 'uv':          return {...b, power:0.5, mode:'on', duration:1, unit:'min'};
-    case 'pump':        return {...b, pump:'Pump1', power:0.5, duration:5.0};
+    case 'pump':        return {...b, pump:'Pump1', duration:5.0};
     case 'turbidostat': return {...b, state:'on'};
     case 'chemostat':   return {...b, state:'on', p1:0.02, p2:0.1};
     case 'zigzag':      return {...b, state:'on', zig:0.04};
@@ -503,13 +506,12 @@ function buildForm(node, body, parentArr){
 
     case 'pump': {
       row('Bomba', selEl('pump', [['Pump1','Pump1 (In)'],['Pump2','Pump2 (Out)'],['Pump3','Pump3 (Aux)'],['Pump4','Pump4 (Aux)']], node.pump, () => { updatePumpNote(); updateVol(); }));
-      row('Potencia (-1 a 1)', numInput('power', node.power, -1, 1, 0.01));
       row('Duración (segundos)', numInput('duration', node.duration, 0.1, 60, 0.1));
       const pnote=note('','');
       function updatePumpNote(){
         const flow = globalPumps[node.pump] || 1.0;
-        const v=(Math.abs(node.power) * (node.duration/60.0) * flow).toFixed(3);
-        pnote.innerHTML=`<i class="fa-solid fa-droplet"></i> Vol. inyectado estimado: <strong>${v} ml</strong> (Caudal: ${flow} ml/min)`;
+        const v=((node.duration/60.0) * flow).toFixed(3);
+        pnote.innerHTML=`<i class="fa-solid fa-droplet"></i> Vol. inyectado estimado: <strong>${v} ml</strong> (Caudal: ${flow} ml/min · bomba on/off)`;
         pnote.className='fnote';
       }
       updatePumpNote();
@@ -584,21 +586,27 @@ function calcVol(arr){
   for(const n of (arr||AST)){
     if(n.type==='pump'){
       const flow = globalPumps[n.pump] || 1.0;
-      const v = Math.abs(n.power) * (n.duration/60.0) * flow;
-      if(n.pump==='Pump2'){ if(n.power>0) outV+=v; else inV+=v; }
-      else{ if(n.power>0) inV+=v; else outV+=v; }
+      const v = (n.duration/60.0) * flow;
+      if(n.pump==='Pump2') outV+=v; else inV+=v;
     }
     if(n.children){ const s=calcVol(n.children); inV+=s.inV*(n.count||1); outV+=s.outV*(n.count||1); }
   } return {inV,outV};
 }
 function updateVol(){
-  const {inV,outV}=calcVol(AST); const net=Math.max(0,inV-outV); const pct=Math.min(100,(net/25)*100);
+  const {inV,outV}=calcVol(AST); const net=Math.max(0,globalInitVol+inV-outV); const pct=Math.min(100,(net/25)*100);
   document.getElementById('vol-bar').style.width=pct+'%'; document.getElementById('vol-bar').classList.toggle('danger',net>25);
   document.getElementById('vol-val').textContent=net.toFixed(2)+' / 25 ml'; document.getElementById('vol-val').style.color=net>25?'var(--danger)':'';
 }
 function updateCount(){
   function cnt(a){ return a.reduce((s,n)=>s+1+(n.children?cnt(n.children):0),0); }
   const c=cnt(AST); document.getElementById('blk-count').textContent=c+(c===1?' bloque':' bloques');
+}
+
+// Returns true for blocks that cause processNodes to advance curr (new FSM state)
+function _isStateAdv(n) {
+  if (n.type === 'wait' && (n.unit === 'min' || n.unit === 'gen')) return true;
+  if ((n.type === 'led' || n.type === 'uv') && n.mode === 'pulse' && n.unit === 'min') return true;
+  return ['ramp_temp','trigger','loop'].includes(n.type);
 }
 
 // ── COMPILE & VALIDATE ───────────────────────────────────────
@@ -621,6 +629,17 @@ function doCompile(){
 }
 
 function validate(nodes,errs,warns,M){
+  if (nodes === AST) {
+    if (!nodes.some(n => n.type === 'init_temp')) errs.push('<strong>[Condición inicial]</strong> Falta el bloque "Temperatura inicial". Es obligatorio.');
+    if (!nodes.some(n => n.type === 'init_od'))   errs.push('<strong>[Condición inicial]</strong> Falta el bloque "OD objetivo inicial". Es obligatorio.');
+    if (!nodes.some(n => n.type === 'init_stir')) errs.push('<strong>[Condición inicial]</strong> Falta el bloque "Agitación inicial". Es obligatorio.');
+    ['init_temp','init_od','init_stir'].forEach(t => {
+      if (nodes.filter(n => n.type === t).length > 1)
+        errs.push(`<strong>[Condición inicial duplicada]</strong> El bloque "${META[t].label}" aparece más de una vez. Solo puede existir uno — el compilador sobreescribirá el valor correcto con el último encontrado. Elimina los duplicados.`);
+    });
+    const ctrlModes = nodes.filter(n => ['turbidostat','chemostat','zigzag'].includes(n.type));
+    if (ctrlModes.length > 1) errs.push(`<strong>[Modos de control]</strong> Solo puede haber un modo de control activo. Se detectaron: ${ctrlModes.map(n=>n.type).join(', ')}.`);
+  }
   let usesOptics = false;
   for(let i=0;i<nodes.length;i++){
     const n=nodes[i];
@@ -629,7 +648,11 @@ function validate(nodes,errs,warns,M){
         if(!safetyOk) errs.push(`[${(META[n.type]&&META[n.type].label)||n.type}] Completa la Confirmación de Seguridad (Tubo insertado).`);
         let t = n.temp || n.temp_end || 0;
         if(t>50) errs.push(`[Termostato] ${t}°C supera el máximo de seguridad de 50°C. Peligro de quemar placa.`);
-        if(t<25) warns.push(`[Temperatura] ${t}°C: Chi.Bio NO tiene refrigeración activa. No bajará de la temperatura ambiente.`);
+        if(t<25) warns.push(`[Temperatura] ${t}°C está por debajo de la temperatura ambiente del laboratorio (25°C). Chi.Bio no tiene refrigeración activa — esta temperatura nunca se alcanzará.`);
+        if(n.type==='ramp_temp'){
+          if(n.temp_start<25) warns.push(`[Rampa Térmica] Temperatura inicial ${n.temp_start}°C está por debajo de la temperatura ambiente (25°C). Chi.Bio no tiene refrigeración activa — esta temperatura nunca se alcanzará.`);
+          if(n.temp_end<25)   warns.push(`[Rampa Térmica] Temperatura final ${n.temp_end}°C está por debajo de la temperatura ambiente (25°C). Chi.Bio no tiene refrigeración activa — esta temperatura nunca se alcanzará.`);
+        }
         break;
       case 'led':
       case 'uv':
@@ -649,12 +672,57 @@ function validate(nodes,errs,warns,M){
       case 'wait': if(n.unit==='sec'&&n.duration>15) errs.push(`[Esperar] Seleccionaste segundos y pusiste más de 15s. Colapsará el ciclo principal. Usa "Minutos" o "Generaciones".`); break;
       case 'chemostat': if(n.p2<=n.p1) warns.push(`[Quimiostato] Pump2 (Out) debería ser mayor que Pump1 para mantener el nivel de líquido.`); break;
       case 'turbidostat': case 'zigzag': usesOptics=true; break;
-      case 'trigger':
-        if(n.tvar==='OD'||n.tvar==='GrowthRate') usesOptics=true;
-        if(n.children) validate(n.children, errs, warns, M); break;
-      case 'loop': if(n.children) validate(n.children, errs, warns, M); break;
+      case 'trigger': {
+        const VALID_TVARS = ['OD','GrowthRate','Temp','FP1','FP2','FP3','Generations'];
+        const VALID_OPS   = ['>','<','>=','<=','=='];
+        if (!VALID_TVARS.includes(n.tvar)) errs.push(`[Trigger] Variable "${n.tvar}" no existe en Chi.Bio. Variables válidas: ${VALID_TVARS.join(', ')}.`);
+        if (!VALID_OPS.includes(n.op))     errs.push(`[Trigger] Operador "${n.op}" no válido. Usa: > < >= <= ==`);
+        if (n.tvar==='OD'||n.tvar==='GrowthRate') usesOptics=true;
+        if (n.children) validate(n.children, errs, warns, M);
+        break;
+      }
+      case 'loop':
+        if (!n.children || n.children.length === 0) errs.push('[Bucle] El bloque "Bucle" está vacío. Agrega al menos un bloque dentro.');
+        if (n.children) validate(n.children, errs, warns, M);
+        break;
     }
   }
+  // ── Bug 1: Thermostat consecutivos en el mismo ciclo FSM ────────────────
+  {
+    let lastTemp = null;
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (_isStateAdv(n)) { lastTemp = null; }
+      else if (n.type === 'thermostat') {
+        if (lastTemp !== null && lastTemp !== n.temp)
+          warns.push(`[Termostato] Dos bloques "Fijar Termostato" consecutivos (${lastTemp}°C → ${n.temp}°C) sin espera entre ellos — ambos se ejecutan en el mismo ciclo FSM y el primero es sobreescrito inmediatamente. Agrega un bloque "Esperar (min)" entre ellos.`);
+        lastTemp = n.temp;
+      }
+    }
+  }
+
+  // ── Bug 2: Esperas bloqueantes acumuladas en el mismo ciclo FSM ──────────
+  {
+    let sT = 0, sC = 0;
+    for (let i = 0; i <= nodes.length; i++) {
+      const n = i < nodes.length ? nodes[i] : null;
+      if (!n || _isStateAdv(n)) {
+        if (sT > 55)
+          errs.push(`[Ciclo FSM] Las esperas bloqueantes acumuladas suman <strong>${sT.toFixed(1)}s</strong> — superan los 60s del ciclo principal. El biorreactor dejará de leer sensores durante ese intervalo completo.`);
+        else if (sT > 25 && sC >= 2)
+          warns.push(`[Ciclo FSM] Las esperas bloqueantes acumuladas suman <strong>${sT.toFixed(1)}s</strong> en un solo ciclo (~${Math.round((sT/60)*100)}% del ciclo de 60s). Habrá pérdida significativa de lecturas de sensores.`);
+        sT = 0; sC = 0;
+      } else {
+        let c = 0;
+        if (n.type === 'pump') c = n.duration || 0;
+        else if (n.type === 'wait' && n.unit === 'sec') c = n.duration || 0;
+        else if ((n.type === 'led' || n.type === 'uv') && n.mode === 'pulse' && n.unit === 'sec') c = n.duration || 0;
+        else if (n.type === 'measure_od') c = 3;
+        if (c > 0) { sT += c; sC++; }
+      }
+    }
+  }
+
   if (usesOptics && nodes === AST && !safetyOk) errs.push('<strong>[Sensores Ópticos]</strong> Confirma la Calibración "OD Zero" en el Checklist de Seguridad.');
   const {inV,outV}=calcVol(nodes); if(inV-outV>25 && nodes===AST) errs.push('[Bombas] Volumen de entrada neto superará los 25ml de capacidad del tubo de vidrio. Inundación inminente.');
 
@@ -691,6 +759,7 @@ function compileFSM(nodes, M, progName) {
 
             if (n.type === 'wait' && n.unit === 'min') {
                 let waitState = allocateState();
+                write(curr, `addTerminal(M, 'Espera: ${n.duration} ciclo${n.duration===1?'':'s'}')`);
                 write(curr, `sysData[M]['Custom']['param1'] = sysData[M]['Experiment']['cycles']`);
                 write(curr, `sysData[M]['Custom']['Status'] = ${waitState}.0`);
                 let next = (i === nodeList.length - 1) ? exitState : allocateState();
@@ -700,6 +769,7 @@ function compileFSM(nodes, M, progName) {
             }
             else if (n.type === 'wait' && n.unit === 'gen') {
                 let waitState = allocateState();
+                write(curr, `addTerminal(M, 'Espera: ${n.duration} generacion${n.duration===1?'':'es'}')`);
                 write(curr, `sysData[M]['Custom']['param2'] = sysData[M]['Custom'].get('Generations', 0.0)`);
                 write(curr, `sysData[M]['Custom']['Status'] = ${waitState}.0`);
                 let next = (i === nodeList.length - 1) ? exitState : allocateState();
@@ -710,6 +780,7 @@ function compileFSM(nodes, M, progName) {
             else if ((n.type === 'led' || n.type === 'uv') && n.mode === 'pulse' && n.unit === 'min') {
                 let waitState = allocateState();
                 let dev = n.type === 'led' ? n.led : 'UV';
+                write(curr, `addTerminal(M, '${dev} encendido — apagado en ${n.duration} ciclo${n.duration===1?'':'s'} al ${Math.round(n.power*100)}%')`);
                 write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`);
                 write(curr, `SetOutputOn(M, '${dev}', 1)`);
                 write(curr, `sysData[M]['Custom']['param1'] = sysData[M]['Experiment']['cycles']`);
@@ -722,13 +793,15 @@ function compileFSM(nodes, M, progName) {
             }
             else if (n.type === 'ramp_temp') {
                 let rampState = allocateState();
+                const rampDur = Math.max(1, n.duration || 1);
+                write(curr, `addTerminal(M, 'Rampa temperatura: ${n.temp_start}°C → ${n.temp_end}°C en ${rampDur} ciclos')`);
                 write(curr, `sysData[M]['Custom']['param1'] = sysData[M]['Experiment']['cycles']`);
                 write(curr, `sysData[M]['Custom']['Status'] = ${rampState}.0`);
                 let next = (i === nodeList.length - 1) ? exitState : allocateState();
-                
+
                 write(rampState, `_elapsed = sysData[M]['Experiment']['cycles'] - sysData[M]['Custom']['param1']`);
-                write(rampState, `if _elapsed <= ${n.duration}:`);
-                write(rampState, `    _target_t = ${n.temp_start} + (${n.temp_end} - ${n.temp_start}) * (_elapsed / ${n.duration})`);
+                write(rampState, `if _elapsed <= ${rampDur}:`);
+                write(rampState, `    _target_t = ${n.temp_start} + (${n.temp_end} - ${n.temp_start}) * (_elapsed / ${rampDur})`);
                 write(rampState, `    sysData[M]['Thermostat']['target'] = _target_t`);
                 write(rampState, `    SetOutputOn(M, 'Thermostat', 1)`);
                 write(rampState, `else:`);
@@ -742,7 +815,8 @@ function compileFSM(nodes, M, progName) {
                 let nextState = (i === nodeList.length - 1) ? exitState : allocateState();
                 
                 const vmap={OD:"sysData[M]['OD']['current']",GrowthRate:"sysData[M]['GrowthRate']['current']",Temp:"sysData[M]['ThermometerIR']['current']",FP1:"sysData[M]['FP1']['Emit1']",FP2:"sysData[M]['FP2']['Emit1']",FP3:"sysData[M]['FP3']['Emit1']",Generations:"sysData[M]['Custom'].get('Generations', 0.0)"};
-                let cond = `${vmap[n.tvar]} ${n.op} ${n.val}`;
+                const safeOp = ['>','<','>=','<=','=='].includes(n.op) ? n.op : '>';
+                let cond = `${vmap[n.tvar] || "sysData[M]['OD']['current']"} ${safeOp} ${n.val}`;
                 
                 if (n.behavior === 'wait') {
                     write(curr, `if ${cond}:`); write(curr, `    sysData[M]['Custom']['Status'] = ${bodyEntry}.0`);
@@ -755,11 +829,13 @@ function compileFSM(nodes, M, progName) {
             }
             else if (n.type === 'loop') {
                 let loopVar = `loop_n${n.id}`; let bodyEntry = allocateState(); let nextState = (i === nodeList.length - 1) ? exitState : allocateState();
+                write(curr, `addTerminal(M, 'Bucle iniciado: ${n.count} iteraciones')`);
                 write(curr, `sysData[M]['Custom']['${loopVar}'] = 0`); write(curr, `sysData[M]['Custom']['Status'] = ${bodyEntry}.0`);
                 let bodyExit = allocateState();
                 if (n.children.length > 0) processNodes(n.children, bodyEntry, bodyExit); else write(bodyEntry, `sysData[M]['Custom']['Status'] = ${bodyExit}.0`);
-                
+
                 write(bodyExit, `sysData[M]['Custom']['${loopVar}'] += 1`);
+                write(bodyExit, `addTerminal(M, f"Iteracion {int(sysData[M]['Custom']['${loopVar}'])} / ${n.count}")`);
                 write(bodyExit, `if sysData[M]['Custom']['${loopVar}'] < ${n.count}:`);
                 write(bodyExit, `    sysData[M]['Custom']['Status'] = ${bodyEntry}.0`);
                 write(bodyExit, `else:`);
@@ -770,14 +846,17 @@ function compileFSM(nodes, M, progName) {
                 // Sincrónicos
                 if (n.type === 'led' || n.type === 'uv') {
                     let dev = n.type === 'led' ? n.led : 'UV';
-                    if (n.mode === 'on') { 
-                        write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`); 
-                        write(curr, `SetOutputOn(M, '${dev}', 1)`); 
+                    if (n.mode === 'on') {
+                        write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`);
+                        write(curr, `SetOutputOn(M, '${dev}', 1)`);
+                        write(curr, `addTerminal(M, '${dev} encendido al ${Math.round(n.power*100)}%')`);
                     }
-                    else if (n.mode === 'off') { 
-                        write(curr, `SetOutputOn(M, '${dev}', 0)`); 
+                    else if (n.mode === 'off') {
+                        write(curr, `SetOutputOn(M, '${dev}', 0)`);
+                        write(curr, `addTerminal(M, '${dev} apagado')`);
                     }
                     else if (n.mode === 'pulse' && n.unit === 'sec') {
+                        write(curr, `addTerminal(M, '${dev} — pulso ${n.duration}s al ${Math.round(n.power*100)}%')`);
                         write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`);
                         write(curr, `SetOutputOn(M, '${dev}', 1)`);
                         write(curr, `time.sleep(${n.duration})`);
@@ -785,19 +864,25 @@ function compileFSM(nodes, M, progName) {
                     }
                 }
                 else if (n.type === 'pump') {
-                    write(curr, `sysData[M]['${n.pump}']['target'] = ${n.power}`); write(curr, `SetOutputOn(M, '${n.pump}', 1)`);
+                    write(curr, `addTerminal(M, '${n.pump} — pulso ${n.duration}s')`);
+                    write(curr, `sysData[M]['${n.pump}']['target'] = 1`); write(curr, `SetOutputOn(M, '${n.pump}', 1)`);
                     write(curr, `time.sleep(${n.duration})`); write(curr, `SetOutputOn(M, '${n.pump}', 0)`);
                 }
-                else if (n.type === 'thermostat') { 
+                else if (n.type === 'thermostat') {
                     write(curr, `sysData[M]['Thermostat']['target'] = ${n.temp}`); write(curr, `SetOutputOn(M, 'Thermostat', 1)`);
+                    write(curr, `addTerminal(M, 'Termostato — ${n.temp}°C')`);
                 }
                 else if (n.type === 'measure_od') {
+                    write(curr, `addTerminal(M, 'Midiendo OD')`);
                     write(curr, `_stirrer_prev = sysData[M]['Stir']['target']`); write(curr, `SetOutputOn(M, 'Stir', 0)`); write(curr, `time.sleep(3)`);
                     write(curr, `MeasureOD(M)`); write(curr, `sysData[M]['Stir']['target'] = _stirrer_prev`); write(curr, `SetOutputOn(M, 'Stir', 1)`);
                 }
-                else if (n.type === 'wait' && n.unit === 'sec') { write(curr, `time.sleep(${n.duration})`); }
+                else if (n.type === 'wait' && n.unit === 'sec') {
+                    write(curr, `addTerminal(M, 'Espera: ${n.duration}s')`);
+                    write(curr, `time.sleep(${n.duration})`);
+                }
                 else if (n.type === 'log') { write(curr, `addTerminal(M, '${n.msg.replace(/'/g,"\\'")}')`); }
-                
+
                 if (i === nodeList.length - 1 && curr !== exitState) write(curr, `sysData[M]['Custom']['Status'] = ${exitState}.0`);
             }
         }
@@ -828,12 +913,30 @@ function compileFSM(nodes, M, progName) {
     
     // Initializers 
     nodes.filter(n=>['init_temp','init_od','init_stir','turbidostat','chemostat','zigzag'].includes(n.type)).forEach(n=>{
-        if(n.type==='init_temp'){ L.push(`            sysData[M]['Thermostat']['target'] = ${n.temp}`); L.push(`            SetOutputOn(M, 'Thermostat', 1)`); }
-        if(n.type==='init_od') L.push(`            sysData[M]['OD']['target'] = ${n.od}`);
-        if(n.type==='init_stir'){ L.push(`            sysData[M]['Stir']['target'] = ${n.speed}`); L.push(`            SetOutputOn(M, 'Stir', 1)`); }
-        if(n.type==='turbidostat') { L.push(`            SetOutputOn(M, 'OD', ${n.state==='on'?1:0})`); }
-        if(n.type==='chemostat') { L.push(`            sysData[M]['Chemostat']['ON'] = ${n.state==='on'?1:0}`); L.push(`            sysData[M]['Chemostat']['p1'] = ${n.p1}`); L.push(`            sysData[M]['Chemostat']['p2'] = ${n.p2}`); }
-        if(n.type==='zigzag') { L.push(`            SetOutputOn(M, 'Zigzag', ${n.state==='on'?1:0})`); L.push(`            sysData[M]['Zigzag']['Zig'] = ${n.zig}`); if(n.state === 'on'){ L.push(`            SetOutputOn(M, 'OD', 1)  # Zigzag requiere Turbidostato`); } }
+        if(n.type==='init_temp'){
+            L.push(`            sysData[M]['Thermostat']['target'] = ${n.temp}`); L.push(`            SetOutputOn(M, 'Thermostat', 1)`);
+            L.push(`            addTerminal(M, 'Termostato — objetivo: ${n.temp}°C')`);
+        }
+        if(n.type==='init_od'){
+            L.push(`            sysData[M]['OD']['target'] = ${n.od}`);
+            L.push(`            addTerminal(M, 'Turbidostato — OD objetivo: ${n.od}')`);
+        }
+        if(n.type==='init_stir'){
+            L.push(`            sysData[M]['Stir']['target'] = ${n.speed}`); L.push(`            SetOutputOn(M, 'Stir', 1)`);
+            L.push(`            addTerminal(M, 'Agitacion: ${Math.round(n.speed*100)}% de potencia')`);
+        }
+        if(n.type==='turbidostat'){
+            L.push(`            SetOutputOn(M, 'OD', ${n.state==='on'?1:0})`);
+            L.push(`            addTerminal(M, 'Turbidostato ${n.state==='on'?'activado':'desactivado'}')`);
+        }
+        if(n.type==='chemostat'){
+            L.push(`            sysData[M]['Chemostat']['ON'] = ${n.state==='on'?1:0}`); L.push(`            sysData[M]['Chemostat']['p1'] = ${n.p1}`); L.push(`            sysData[M]['Chemostat']['p2'] = ${n.p2}`);
+            L.push(`            addTerminal(M, 'Quimiostato ${n.state==='on'?'activado':'desactivado'} — P1=${n.p1}, P2=${n.p2}')`);
+        }
+        if(n.type==='zigzag'){
+            L.push(`            SetOutputOn(M, 'Zigzag', ${n.state==='on'?1:0})`); L.push(`            sysData[M]['Zigzag']['Zig'] = ${n.zig}`); if(n.state === 'on'){ L.push(`            SetOutputOn(M, 'OD', 1)  # Zigzag requiere Turbidostato`); }
+            L.push(`            addTerminal(M, 'Zigzag ${n.state==='on'?'activado':'desactivado'} — amplitud OD: ${n.zig}')`);
+        }
     });
 
     L.push(`            sysData[M]['Custom']['Status'] = 1.0`);
@@ -901,6 +1004,7 @@ function exportExperiment(){
     reactor: getM(),
     program: getProg(),
     pumps: globalPumps,
+    initialVol: globalInitVol,
     ast: AST
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -931,10 +1035,10 @@ function importExperiment(event){
       reassignIds(data.ast);
       data.ast.forEach(n => AST.push(n));
       if(data.pumps) Object.assign(globalPumps, data.pumps);
-      
-      // Restore reactor/program if saved
+      if(data.initialVol !== undefined) globalInitVol = Math.min(25, Math.max(0, data.initialVol));
+
+      // Restore reactor if saved (program slot is always C8)
       if(data.reactor) document.getElementById('dev-sel').value = data.reactor;
-      if(data.program) document.getElementById('prog-sel').value = data.program;
       
       refresh();
       toast(`Experimento cargado — ${AST.length} bloques ✓`, 'ok');
@@ -957,6 +1061,66 @@ function handleAIKeyPress(event) {
     }
 }
 
+const _TVAR_NORMALIZE = {od:'OD',growthrate:'GrowthRate',temp:'Temp',fp1:'FP1',fp2:'FP2',fp3:'FP3',generations:'Generations'};
+const _OP_NORMALIZE   = {gt:'>',lt:'<',gte:'>=',lte:'<=',ge:'>=',le:'<=',eq:'=='};
+const _LED_NORMALIZE  = {blue:'LEDB',azul:'LEDB',green:'LEDD',verde:'LEDD',red:'LEDF',rojo:'LEDF',white:'LEDG',blanco:'LEDG'};
+const _LED_VALID      = ['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI'];
+const _PUMP_VALID     = ['Pump1','Pump2','Pump3','Pump4'];
+const _UNIT_VALID     = ['sec','min','gen'];
+
+function _normalizePump(v){
+    if(v === undefined || v === null) return 'Pump1';
+    const s = String(v).trim();
+    const m = s.match(/[1-4]/);
+    if(m){
+        const cand = 'Pump' + m[0];
+        if(_PUMP_VALID.includes(cand)) return cand;
+    }
+    return 'Pump1';
+}
+
+function _normalizeLed(v){
+    if(v === undefined || v === null) return 'LEDB';
+    const s = String(v).trim();
+    if(_LED_VALID.includes(s)) return s;
+    const up = s.toUpperCase();
+    if(_LED_VALID.includes(up)) return up;
+    return _LED_NORMALIZE[s.toLowerCase()] || 'LEDB';
+}
+
+function sanitizeAINode(n) {
+    if (n.power      !== undefined) n.power      = Math.min(1.0, Math.max(0.0, Number(n.power)      || 0));
+    if (n.speed      !== undefined) n.speed      = Math.min(1.0, Math.max(0.0, Number(n.speed)      || 0.5));
+    if (n.temp       !== undefined) n.temp       = Math.min(50,  Math.max(15,  Number(n.temp)       || 37));
+    if (n.temp_start !== undefined) n.temp_start = Math.min(50,  Math.max(15,  Number(n.temp_start) || 37));
+    if (n.temp_end   !== undefined) n.temp_end   = Math.min(50,  Math.max(15,  Number(n.temp_end)   || 37));
+    if (n.type === 'ramp_temp' && n.duration !== undefined) n.duration = Math.max(1, Number(n.duration) || 1);
+    if (n.tvar !== undefined) n.tvar = _TVAR_NORMALIZE[n.tvar.toLowerCase()] || n.tvar;
+    if (n.op   !== undefined) n.op   = _OP_NORMALIZE[n.op.toLowerCase()]     || n.op;
+
+    if (n.type === 'pump') {
+        n.pump = _normalizePump(n.pump);
+        if (n.duration !== undefined) n.duration = Math.min(20, Math.max(0, Number(n.duration) || 0));
+        delete n.power;
+    }
+    if (n.type === 'led') n.led = _normalizeLed(n.led);
+    if ((n.type === 'led' || n.type === 'uv' || n.type === 'wait') && n.unit !== undefined) {
+        if (!_UNIT_VALID.includes(n.unit)) n.unit = 'min';
+    }
+    if ((n.type === 'led' || n.type === 'uv' || n.type === 'wait') && n.duration !== undefined) {
+        let d = Number(n.duration) || 0;
+        if (n.unit === 'sec') d = Math.min(15, Math.max(0, d));
+        else d = Math.max(0, d);
+        n.duration = d;
+    }
+    if (n.type === 'loop' && n.count !== undefined) {
+        n.count = Math.max(2, parseInt(n.count, 10) || 2);
+    }
+
+    if (n.children) n.children.forEach(sanitizeAINode);
+    return n;
+}
+
 async function triggerAIGeneration() {
     const inputEl = document.getElementById('ai-prompt-input');
     const btnEl = document.getElementById('ai-btn');
@@ -967,16 +1131,28 @@ async function triggerAIGeneration() {
         return;
     }
 
+    if (AST.length > 0) {
+        const confirmed = confirm('La IA generará un experimento nuevo y borrará los bloques actuales del canvas.\n\n¿Continuar? (Puedes deshacer con Ctrl+Z)');
+        if (!confirmed) return;
+        _historySave();
+        AST.length = 0;
+        refresh();
+    }
+
     inputEl.disabled = true;
     btnEl.disabled = true;
     btnEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Pensando...';
     toast("IA procesando el lenguaje natural...", "info");
 
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 35000);
+
     try {
         const response = await fetch('/generateProtocol/', {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt: promptText })
+            body: JSON.stringify({ prompt: promptText }),
+            signal: ctrl.signal
         });
 
         if (!response.ok) throw new Error("Error HTTP " + response.status);
@@ -996,10 +1172,14 @@ async function triggerAIGeneration() {
         function assignIds(nodes) {
             nodes.forEach(n => {
                 n.id = uid();
+                if (n.type === 'loop' || n.type === 'trigger') {
+                    if (!Array.isArray(n.children)) n.children = [];
+                }
                 if (n.children) assignIds(n.children);
             });
         }
         assignIds(generatedNodes);
+        generatedNodes.forEach(sanitizeAINode);
 
         _historySave();
         generatedNodes.forEach(node => AST.push(node));
@@ -1014,7 +1194,7 @@ async function triggerAIGeneration() {
         toast("Fallo al entender la instrucción", "err");
         addMsg("err", "❌", `Error IA: ${error.message}.`);
     } finally {
-        // Restaurar la UI
+        clearTimeout(timer);
         inputEl.disabled = false;
         btnEl.disabled = false;
         btnEl.innerHTML = '<i class="fa-solid fa-robot"></i> Generar';
@@ -1081,7 +1261,6 @@ let tourStep = 0;
 let _tourActive = false;
 
 function startTour(){
-  localStorage.setItem('chibio_tour_done','1');
   tourStep = 0;
   _tourActive = true;
   _postParent({ type:'tourOverlay', active:true });
@@ -1183,6 +1362,7 @@ function tourPrev(){
   tourStep--; renderTourStep();
 }
 function endTour(){
+  localStorage.setItem('chibio_tour_done','1');
   _tourActive = false;
   document.body.classList.remove('tour-active');
   document.getElementById('tour-overlay').classList.remove('active');
@@ -1372,8 +1552,8 @@ window.addEventListener('message', function(e){
           reassignIds(data.ast);
           data.ast.forEach(n => AST.push(n));
           if(data.pumps) Object.assign(globalPumps, data.pumps);
+          if(data.initialVol !== undefined) globalInitVol = Math.min(25, Math.max(0, data.initialVol));
           if(data.reactor) { document.getElementById('dev-sel').value = data.reactor; document.getElementById('dev-badge').textContent = data.reactor; }
-          if(data.program) document.getElementById('prog-sel').value = data.program;
           refresh();
           toast(`Experimento cargado — ${AST.length} bloques ✓`, 'ok');
         } catch(err){ toast('Error al importar', 'err'); }
@@ -1381,9 +1561,6 @@ window.addEventListener('message', function(e){
       case 'setReactor':
         document.getElementById('dev-sel').value = e.data.val;
         document.getElementById('dev-badge').textContent = e.data.val;
-        break;
-      case 'setDestino':
-        document.getElementById('prog-sel').value = e.data.val;
         break;
     }
   }

@@ -16,7 +16,7 @@ echo "Iniciando servidor en http://$HOST:$PORT ..."
 exec gunicorn \
     --bind "$HOST:$PORT" \
     --workers 1 \
-    --threads 2 \
-    --timeout 120 \
+    --threads 4 \
+    --timeout 30 \
     --access-logfile - \
     app:application

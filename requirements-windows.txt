@@ -1,0 +1,12 @@
+# Chi.Bio Nexus — PC Windows
+# Servidor de cámara WebRTC + entorno de desarrollo local
+# Instalar con: pip install -r requirements-windows.txt
+
+fastapi
+uvicorn[standard]
+aiortc
+av
+opencv-python
+numpy
+websockets
+flask

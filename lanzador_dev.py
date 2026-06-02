@@ -7,7 +7,7 @@ Simula 3 reactores (M0, M1, M2) con datos biológicos realistas.
 No requiere BeagleBone ni hardware Chi.Bio.
 
 Uso:
-    pip install -r requirements-dev.txt
+    pip install -r requirements-windows.txt
     python lanzador_dev.py
 """
 

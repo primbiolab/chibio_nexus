@@ -10,10 +10,10 @@ from threading import Thread, Lock
 import threading
 import numpy as np
 from datetime import datetime, date
+import html
+import json
 import Adafruit_GPIO.I2C as I2C
 import Adafruit_BBIO.GPIO as GPIO
-import serial
-import simplejson
 import copy
 import csv
 import smbus2 as smbus
@@ -30,30 +30,44 @@ _cloud = {
 application = Flask(__name__)
 application.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
+@application.after_request
+def add_security_headers(response):
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://ajax.googleapis.com https://www.gstatic.com "
+        "https://cdnjs.cloudflare.com 'unsafe-inline'; "
+        "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com 'unsafe-inline'; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self' https://camera.primbiolab.org wss://camera.primbiolab.org;"
+    )
+    return response
+
 @application.before_request
 def block_mobile():
     ua = request.headers.get('User-Agent', '')
-    mobile_keywords = ['Mobile', 'Android', 'iPhone', 'iPad', 'webOS', 'BlackBerry']
+    mobile_keywords = ['Mobile', 'Android', 'iPhone', 'webOS', 'BlackBerry']
     if any(kw in ua for kw in mobile_keywords):
-        return '''<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="UTF-8"><title>Chi.Bio Nexus</title>
-<style>
-  body{margin:0;background:#0b0e14;display:flex;align-items:center;
-       justify-content:center;height:100vh;font-family:sans-serif;}
-  .box{text-align:center;color:#e2e8f0;padding:40px;}
-  h1{color:#00d68f;font-size:22px;margin-bottom:12px;}
-  p{color:#94a3b8;font-size:14px;max-width:320px;line-height:1.6;}
-  .icon{font-size:40px;margin-bottom:16px;}
-</style></head>
-<body><div class="box">
-  <div class="icon">🔬</div>
-  <h1>Chi.Bio Nexus</h1>
-  <p>Esta plataforma requiere un navegador de escritorio.<br><br>
-  El acceso desde dispositivos móviles no está habilitado por razones de seguridad operacional.</p>
-</div></body></html>''', 403 #Try this https://stackoverflow.com/questions/23112316/using-flask-how-do-i-modify-the-cache-control-header-for-all-output/23115561#23115561
+        return render_template('mobile_blocked.html'), 403
 
 lock=Lock()
+
+# ── Cache de análisis Gemini {hash_code: analysis_text} ──────────
+_gemini_cache = {}
+# ── Rate-limit simple: {ip: [timestamp, ...]} ────────────────────
+_gemini_rate  = {}
+_RATE_WINDOW  = 60   # segundos
+_RATE_LIMIT   = 10   # llamadas por ventana
+
+def _gemini_rate_ok(ip):
+    import time as _time
+    now = _time.time()
+    hits = [t for t in _gemini_rate.get(ip, []) if now - t < _RATE_WINDOW]
+    _gemini_rate[ip] = hits
+    if len(hits) >= _RATE_LIMIT:
+        return False
+    _gemini_rate[ip].append(now)
+    return True
         
 #Initialise data structures.
 
@@ -78,7 +92,7 @@ sysData = {'M0' : {
    'Heat' : {'default': 0.0, 'target' : 0.0, 'max': 1.0, 'min' : 0.0,'ON' : 0,'record' : []},
    'Thermostat' : {'default': 37.0, 'target' : 0.0, 'max': 50.0, 'min' : 0.0,'ON' : 0,'record' : [],'cycleTime' : 30.0, 'Integral' : 0.0,'last' : -1},
    'Experiment' : {'indicator' : 'USR0', 'startTime' : 'Waiting', 'startTimeRaw' : 0, 'ON' : 0,'cycles' : 0, 'cycleTime' : 60.0,'threadCount' : 0},
-   'Terminal' : {'text' : ''},
+   'Terminal' : {'text' : []},
    'AS7341' : {
         'spectrum' : {'nm410' : 0, 'nm440' : 0, 'nm470' : 0, 'nm510' : 0, 'nm550' : 0, 'nm583' : 0, 'nm620' : 0, 'nm670' : 0,'CLEAR' : 0, 'NIR' : 0,'DARK' : 0,'ExtGPIO' : 0, 'ExtINT' : 0, 'FLICKER' : 0},
         'channels' : {'nm410' : 0, 'nm440' : 0, 'nm470' : 0, 'nm510' : 0, 'nm550' : 0, 'nm583' : 0, 'nm620' : 0, 'nm670' : 0,'CLEAR' : 0, 'NIR' : 0,'DARK' : 0,'ExtGPIO' : 0, 'ExtINT' : 0, 'FLICKER' : 0},
@@ -426,18 +440,30 @@ def initialise(M):
 	
     sysData[M]['GrowthRate']['record']=[]
 
-    sysDevices[M]['ThermometerInternal']['device']=I2C.get_i2c_device(0x18,2) #Get Thermometer on Bus 2!!!
-    sysDevices[M]['ThermometerExternal']['device']=I2C.get_i2c_device(0x1b,2) #Get Thermometer on Bus 2!!!
-    sysDevices[M]['DAC']['device']=I2C.get_i2c_device(0x48,2) #Get DAC on Bus 2!!!
-    sysDevices[M]['AS7341']['device']=I2C.get_i2c_device(0x39,2) #Get OD Chip on Bus 2!!!!!
-    sysDevices[M]['Pumps']['device']=I2C.get_i2c_device(0x61,2) #Get OD Chip on Bus 2!!!!!
+    _i2c_map = [
+        ('ThermometerInternal', lambda: I2C.get_i2c_device(0x18, 2)),
+        ('ThermometerExternal', lambda: I2C.get_i2c_device(0x1b, 2)),
+        ('DAC',                 lambda: I2C.get_i2c_device(0x48, 2)),
+        ('AS7341',              lambda: I2C.get_i2c_device(0x39, 2)),
+        ('Pumps',               lambda: I2C.get_i2c_device(0x61, 2)),
+        ('PWM',                 lambda: I2C.get_i2c_device(0x60, 2)),
+    ]
+    for _dev_name, _factory in _i2c_map:
+        try:
+            sysDevices[M][_dev_name]['device'] = _factory()
+        except Exception as _e:
+            print(str(datetime.now()) + ' [ERROR] I2C init fail ' + M + '/' + _dev_name + ': ' + str(_e))
+            sysData[M]['present'] = 0
     sysDevices[M]['Pumps']['startup']=0
     sysDevices[M]['Pumps']['frequency']=0x1e #200Hz PWM frequency
-    sysDevices[M]['PWM']['device']=I2C.get_i2c_device(0x60,2) #Get OD Chip on Bus 2!!!!!
     sysDevices[M]['PWM']['startup']=0
-    sysDevices[M]['PWM']['frequency']=0x03# 0x14 = 300hz, 0x03 is 1526 Hz PWM frequency for fan/LEDs, maximum possible. Potentially dial this down if you are getting audible ringing in the device! 
+    sysDevices[M]['PWM']['frequency']=0x03# 0x14 = 300hz, 0x03 is 1526 Hz PWM frequency for fan/LEDs, maximum possible. Potentially dial this down if you are getting audible ringing in the device!
     #There is a tradeoff between large frequencies which can make capacitors in the 6V power regulation oscillate audibly, and small frequencies which result in the number of LED "ON" cycles varying during measurements.
-    sysDevices[M]['ThermometerIR']['device']=smbus.SMBus(bus=2) #Set up SMBus thermometer
+    try:
+        sysDevices[M]['ThermometerIR']['device'] = smbus.SMBus(bus=2)
+    except Exception as _e:
+        print(str(datetime.now()) + ' [ERROR] SMBus init fail ' + M + '/ThermometerIR: ' + str(_e))
+        sysData[M]['present'] = 0
     sysDevices[M]['ThermometerIR']['address']=0x5a 
     
     
@@ -489,13 +515,11 @@ def initialise(M):
         if (NewLevel>Baseline*3+20):
             V1_Present = 1
         
-        if (V1_Present==1 and V2_Present==0):
-            sysData[M]['Version']['LED']=1
-        elif (V1_Present==0 and V2_Present==1):
-            sysData[M]['Version']['LED']=2
-        else:
-            sysData[M]['Version']['LED']=1 #We have messed up somehow in this case and stuff isn't going to work well
-            print(str(datetime.now()) + " ERROR on " + str(M) +', this device has an unknown LED version. Defaulting to version 1.')
+        # La autodetección óptica al 10% da falso V2 con el 6500K (banda ancha) porque no supera
+        # el umbral nm583 que el 600nm (banda angosta) sí supera. El hardware aquí es V1 con 6500K
+        # funcional, así que forzamos V1. Conservamos la medición cruda solo para diagnóstico.
+        print(str(datetime.now()) + " LED detect raw on " + str(M) + ": V1_Present=" + str(V1_Present) + " V2_Present=" + str(V2_Present) + " -> forzado a V1")
+        sysData[M]['Version']['LED']=1
 
         
 
@@ -552,6 +576,10 @@ def turnEverythingOff(M):
 
  
 
+@application.route('/mobile-blocked')
+def mobile_blocked():
+    return render_template('mobile_blocked.html'), 403
+
 @application.route('/')
 def index():
     #Function responsible for sending appropriate device's data to user interface. 
@@ -575,12 +603,18 @@ def getSysdata():
     #Similar to function above, packages data to be sent to UI.
     global sysData
     global sysItems
+    global _cloud
     outputdata=sysData[sysItems['UIDevice']]
     for M in ['M0','M1','M2','M3','M4','M5','M6','M7']:
             if sysData[M]['present']==1:
                 outputdata['presentDevices'][M]=1
             else:
                 outputdata['presentDevices'][M]=0
+    outputdata['cloud'] = {
+        'status'       : _cloud['status'],
+        'error_msg'    : _cloud['error_msg'],
+        'inject_count' : _cloud['inject_count'],
+    }
     return jsonify(outputdata)
 
 @application.route('/getCloudStatus/')
@@ -642,11 +676,12 @@ def GetID(M):
     
 
 def addTerminal(M,strIn):
-    #Responsible for adding a new line to the terminal in the UI.
     global sysData
     now=datetime.now()
-    timeString=now.strftime("%Y-%m-%d %H:%M:%S ")
-    sysData[M]['Terminal']['text']=timeString + ' - ' +  str(strIn) + '</br>' + sysData[M]['Terminal']['text']
+    entry={'time':now.strftime("%H:%M:%S"),'msg':html.escape(str(strIn))}
+    sysData[M]['Terminal']['text'].insert(0,entry)
+    if len(sysData[M]['Terminal']['text'])>200:
+        sysData[M]['Terminal']['text']=sysData[M]['Terminal']['text'][:200]
     
 @application.route("/ClearTerminal/<M>",methods=['POST'])
 def clearTerminal(M):
@@ -656,7 +691,7 @@ def clearTerminal(M):
     if (M=="0"):
         M=sysItems['UIDevice']
         
-    sysData[M]['Terminal']['text']=''
+    sysData[M]['Terminal']['text']=[]
     addTerminal(M,'Terminal Cleared')
     return ('', 204)   
     
@@ -690,11 +725,19 @@ def SetFPMeasurement(item,Excite,Base,Emit1,Emit2,Gain):
     
     
 
+_ALLOWED_OUTPUT_ITEMS = {
+    'OD','Thermostat','Stir','Heat','UV','Volume',
+    'LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI','LEDV','LASER650',
+    'Pump1','Pump2','Pump3','Pump4','GrowthRate',
+}
+
 @application.route("/SetOutputTarget/<item>/<M>/<value>",methods=['POST'])
 def SetOutputTarget(M,item, value):
     #General function used to set the output level of a particular item, ensuring it is within an acceptable range.
     global sysData
     item = str(item)
+    if item not in _ALLOWED_OUTPUT_ITEMS:
+        return jsonify({'error': 'Item no permitido'}), 400
     value = float(value)
     M=str(M)
     if (M=="0"):
@@ -715,11 +758,15 @@ def SetOutputTarget(M,item, value):
 
 
     
+_ALLOWED_ON_ITEMS = _ALLOWED_OUTPUT_ITEMS | {'OD','Zigzag','Thermostat','Custom','Light'}
+
 @application.route("/SetOutputOn/<item>/<force>/<M>",methods=['POST'])
 def SetOutputOn(M,item,force):
     #General function used to switch an output on or off.
     global sysData
     item = str(item)
+    if item not in _ALLOWED_ON_ITEMS:
+        return jsonify({'error': 'Item no permitido'}), 400
     
     force = int(force)
     M=str(M)
@@ -754,6 +801,8 @@ def SetOutput(M,item):
     global sysItems
     global sysDevices
     M=str(M)
+    if sysData[M]['present'] == 0:
+        return
     #We go through each different item and set it going as appropriate.
     if(item=='Stir'): 
         #Stirring is initiated at a high speed for a couple of seconds to prevent the stir motor from stalling (e.g. if it is started at an initial power of 0.3)
@@ -781,8 +830,11 @@ def SetOutput(M,item):
         sysDevices[M][item]['thread'].setDaemon(True)
         sysDevices[M][item]['thread'].start();
         
-    elif (item=='Pump1' or item=='Pump2' or item=='Pump3' or item=='Pump4'): 
-        if (sysData[M][item]['target']==0):
+    elif (item=='Pump1' or item=='Pump2' or item=='Pump3' or item=='Pump4'):
+        # En modo experimento un target=0 implica bomba apagada (RegulateOD fija targets explícitos).
+        # En modo manual NO apagamos: PumpModulation corre a full (pwm_fraction=1.0) cuando target=0,
+        # de modo que el botón On siempre actúa aunque no se haya fijado una tasa.
+        if (sysData[M]['Experiment']['ON']==1 and sysData[M][item]['target']==0):
             sysData[M][item]['ON']=0
         sysDevices[M][item]['thread']=Thread(target = PumpModulation, args=(M,item))
         
@@ -792,12 +844,19 @@ def SetOutput(M,item):
     elif (item=='OD'):
         SetOutputOn(M,'Pump1',0)
         SetOutputOn(M,'Pump2',0) #We turn pumps off when we switch OD state
+        if (sysData[M]['OD']['ON']==1):
+            sysData[M]['Zigzag']['ON']=0
     elif (item=='Zigzag'):
         sysData[M]['Zigzag']['target']=5.0
         sysData[M]['Zigzag']['SwitchPoint']=sysData[M]['Experiment']['cycles']
+        if (sysData[M]['Zigzag']['ON']==1):
+            sysData[M]['OD']['ON']=0
     
-    elif (item=='LEDC' or item=='LEDD' or item=='LEDF' or item=='LEDG' or item == 'LEDH'): 
-        setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
+    elif (item=='LEDC' or item=='LEDD' or item=='LEDF' or item=='LEDG' or item == 'LEDH'):
+        _frac = sysData[M][item]['target']*float(sysData[M][item]['ON'])
+        if item=='LEDG':
+            print(str(datetime.now()) + ' [LEDG] target=' + str(sysData[M][item]['target']) + ' ON=' + str(sysData[M][item]['ON']) + ' frac=' + str(_frac))
+        setPWM(M,'PWM',sysItems[item],_frac,0)
     elif (item=='LEDB' or item == 'LEDI'): #We must handle these differently in case they are simultaneously being used to mix with LEDV
         if (sysData[M]['LEDV']['target']*float(sysData[M]['LEDV']['ON'])>0): #If LEDV is on, we need to make up the difference in these other LEDs.
             # First determine what is the intensity for this LED required to maintain current LEDV level. Note we have alreayd checked that LEDV is on.
@@ -874,21 +933,21 @@ def PumpModulation(M,item):
     if (sysData[M][item]['ON']==0):
         return
 
-    # ── MODO MANUAL: sin experimento corriendo, la bomba corre continua con velocidad proporcional al target ──
+    # ── MODO MANUAL: sin experimento corriendo, la bomba corre continua ──
     if sysData[M]['Experiment']['ON'] == 0:
-        # Usar abs(target) como fracción PWM directa para control de velocidad.
-        # Se aplica umbral mínimo de 0.15 para garantizar arranque confiable del motor peristáltico.
+        # Con target=0 (defecto) se corre a velocidad máxima, igual que el original.
+        # Con target distinto de cero se usa como fracción PWM (mínimo 0.15 para arranque seguro).
         pwm_fraction = abs(sysData[M][item]['target'])
-        if 0 < pwm_fraction < 0.15:
+        if 0.0 < pwm_fraction < 0.15:
             pwm_fraction = 0.15
-        if pwm_fraction > 1.0:
+        elif pwm_fraction > 1.0:
             pwm_fraction = 1.0
 
         sysDevices[M][item]['active']=1
-        if sysData[M][item]['target'] > 0:
+        if sysData[M][item]['target'] >= 0:
             setPWM(M,'Pumps',sysItems[item]['In1'],pwm_fraction,0)
             setPWM(M,'Pumps',sysItems[item]['In2'],0.0,0)
-        elif sysData[M][item]['target'] < 0:
+        else:
             setPWM(M,'Pumps',sysItems[item]['In1'],0.0,0)
             setPWM(M,'Pumps',sysItems[item]['In2'],pwm_fraction,0)
         sysDevices[M][item]['active']=0
@@ -1039,18 +1098,24 @@ def Thermostat(M,item):
     
         
 
+_ALLOWED_PUMPS = {'Pump1','Pump2','Pump3','Pump4'}
+
 @application.route("/Direction/<item>/<M>",methods=['POST'])
 def direction(M,item):
-    #Flips direction of a pump.
     global sysData
+    item = str(item)
+    if item not in _ALLOWED_PUMPS:
+        return jsonify({'error': 'Item no permitido'}), 400
     M=str(M)
     if (M=="0"):
         M=sysItems['UIDevice']
-    sysData[M][item]['target']=-1.0*sysData[M][item]['target']
-    if (sysData[M]['OD']['ON']==1):
-            sysData[M][item]['direction']=-1.0*sysData[M][item]['direction']
-
-    return ('', 204)  
+    sysData[M][item]['direction']=-1.0*sysData[M][item]['direction']
+    if sysData[M][item]['target']!=0.0:
+        sysData[M][item]['target']=-1.0*sysData[M][item]['target']
+    if sysData[M][item]['ON']==1:
+        SetOutputOn(M,item,0)
+        SetOutputOn(M,item,1)
+    return ('', 204)
     
 
     
@@ -1263,7 +1328,7 @@ def CustomProgram(M):
     proto_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'protocolo.py')
     if os.path.exists(proto_path):
         try:
-            with open(proto_path, 'r') as f:
+            with open(proto_path, 'r', encoding='utf-8') as f:
                 code = f.read().strip()
             if code:
                 _nexus_exec(M, code, program)
@@ -1391,6 +1456,26 @@ def CustomProgram(M):
             time.sleep(Dose)
             SetOutputOn(M, 'UV', 0)
 
+    elif (program == "C7"):
+        # Controlador PI de tasa de crecimiento via Bomba1 (dilución con medio fresco)
+        GrowthRate = sysData[M]['GrowthRate']['current']
+        GrowthTarget = sysData[M]['Custom']['Status']
+        error = GrowthTarget - GrowthRate
+        KP = 1.0
+        KI = 0.05
+        integral = sysData[M]['Custom']['param2'] + error * KI
+        if integral < 0:
+            integral = 0.0
+        sysData[M]['Custom']['param2'] = integral
+        Pump1 = KP * error + integral
+        if Pump1 < 0.0:
+            Pump1 = 0.0
+        if Pump1 > 1.0:
+            Pump1 = 1.0
+        sysData[M]['Custom']['param1'] = Pump1
+        SetOutputTarget(M, 'Pump1', Pump1)
+        SetOutputOn(M, 'Pump1', 1)
+
     elif (program == "C8"):
         # Lógica de respaldo para C8 (User Slot)
         current_status = sysData[M]['Custom']['Status']
@@ -1451,7 +1536,7 @@ def CharacteriseDevice(M,Program):
     # THis umbrella function is used to run the actual characteriseation function in a thread to prevent GUnicorn worker timeout.
     Program=str(Program)
     if (Program=='C1'):
-        cthread=Thread(target = CharacteriseDevice2, args=(M))
+        cthread=Thread(target = CharacteriseDevice2, args=(M,))
         cthread.setDaemon(True)
         cthread.start()
     
@@ -1497,9 +1582,8 @@ def CharacteriseDevice2(M):
                 
     
     filename = 'characterisation_data_' + M + '.txt'
-    f = open(filename,'w')
-    simplejson.dump(result,f)
-    f.close()
+    with open(filename,'w') as f:
+        json.dump(result, f)
     return
 
   
@@ -1855,7 +1939,8 @@ def setPWM(M,device,channels,fraction,ConsecutiveFails):
     #Sets up the PWM chip (either the one in the reactor or on the pump board)
     global sysItems
     global sysDevices
-    
+    if sysData[M]['present'] == 0:
+        return
     if sysDevices[M][device]['startup']==0: #The following boots up the respective PWM device to the correct frequency. Potentially there is a bug here; if the device loses power after this code is run for the first time it may revert to default PWM frequency.
         I2CCom(M,device,0,8,0x00,0x10,0) #Turns off device. Also disables all-call functionality at bit 0 so it won't respond to address 0x70
         I2CCom(M,device,0,8,0x04,0xe6,0) #Sets SubADDR3 of the PWM chips to be 0x73 instead of 0x74 to avoid any potential collision with the multiplexer @ 0x74
@@ -2293,20 +2378,6 @@ def runExperiment(M,placeholder):
         sysData[M]['Experiment']['cycles']=sysData[M]['Experiment']['cycles']-1 # Cycle didn't finish, don't count it.
         addTerminal(M,'Experiment Stopped')
         return
-    #Temporary Biofilm Section - the below makes the device all spectral data for all LEDs each cycle.
-    
-    # bands=['nm410' ,'nm440','nm470','nm510','nm550','nm583','nm620','nm670','CLEAR','NIR']    
-    # items= ['LEDA','LEDB','LEDC','LEDD','LEDE','LEDF','LEDG','LASER650']
-    # gains=['x10','x10','x10','x10','x10','x10','x10','x1']
-    # gi=-1
-    # for item in items:
-    #     gi=gi+1
-    #     SetOutputOn(M,item,1)
-    #     GetSpectrum(M,gains[gi])
-    #     SetOutputOn(M,item,0)
-    #     for band in bands:
-    #         sysData[M]['biofilm'][item][band]=int(sysData[M]['AS7341']['spectrum'][band])
-
     sysData[M]['OD']['Measuring']=0
     if (sysData[M]['OD']['ON']==1):
         RegulateOD(M) #Function that calculates new target pump rates, and sets pumps to desired rates. 
@@ -2367,9 +2438,8 @@ def runExperiment(M,placeholder):
         
         filename = sysData[M]['Experiment']['startTime'] + '_' + M + '.txt'
         filename=filename.replace(":","_")
-        f = open(filename,'w')
-        simplejson.dump(sysData[M],f)
-        f.close()
+        with open(filename,'w') as f:
+            json.dump(sysData[M], f)
         sysData[M]['Experiment']['startTimeRaw']=TempStartTime
     ##### Written
 
@@ -2411,24 +2481,27 @@ def runExperiment(M,placeholder):
 from config import GEMINI_API_KEY
 GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY
 
-def _gemini_request(prompt, system_prompt=None):
+def _gemini_request(prompt, system_prompt=None, use_json_mode=False):
     """Llama a Gemini y devuelve el texto de respuesta o lanza excepción."""
     import urllib.request as _req
-    import json as _json
 
     contents = []
     if system_prompt:
         contents.append({'role': 'user', 'parts': [{'text': '<<system>>\n' + system_prompt}]})
     contents.append({'role': 'user', 'parts': [{'text': prompt}]})
 
-    body = _json.dumps({
+    gen_config = {'temperature': 0.1}
+    if use_json_mode:
+        gen_config['responseMimeType'] = 'application/json'
+
+    body = json.dumps({
         'contents': contents,
-        'generationConfig': {'temperature': 0.1}
+        'generationConfig': gen_config,
     }).encode('utf-8')
 
-    request = _req.Request(GEMINI_URL, data=body, headers={'Content-Type': 'application/json'}, method='POST')
-    with _req.urlopen(request, timeout=30) as resp:
-        data = _json.loads(resp.read().decode('utf-8'))
+    req = _req.Request(GEMINI_URL, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+    with _req.urlopen(req, timeout=10) as resp:
+        data = json.loads(resp.read().decode('utf-8'))
     return data['candidates'][0]['content']['parts'][0]['text']
 
 
@@ -2437,19 +2510,28 @@ def analyzeProtocol():
     """
     Lee protocolo.py del disco, llama a Gemini y devuelve
     el código fuente + descripción en lenguaje natural.
+    Incluye caché por hash del código y rate-limit por IP.
     """
-    from flask import request as _request, jsonify as _jsonify
+    import hashlib as _hashlib
     import os as _os
     try:
+        client_ip = request.remote_addr or 'unknown'
+        if not _gemini_rate_ok(client_ip):
+            return jsonify({'error': 'Demasiadas peticiones. Espera un minuto.'}), 429
+
         proto_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'protocolo.py')
         if not _os.path.exists(proto_path):
-            return _jsonify({'error': 'No se encontró protocolo.py en el servidor.'}), 404
+            return jsonify({'error': 'No se encontró protocolo.py en el servidor.'}), 404
 
-        with open(proto_path, 'r') as f:
+        with open(proto_path, 'r', encoding='utf-8') as f:
             code = f.read().strip()
 
         if not code:
-            return _jsonify({'error': 'protocolo.py está vacío.'}), 400
+            return jsonify({'error': 'protocolo.py está vacío.'}), 400
+
+        code_hash = _hashlib.sha256(code.encode()).hexdigest()
+        if code_hash in _gemini_cache:
+            return jsonify({'analysis': _gemini_cache[code_hash], 'code': code, 'cached': True})
 
         prompt = (
             'Eres un asistente técnico especializado en biorreactores Chi.Bio.\n'
@@ -2468,10 +2550,11 @@ def analyzeProtocol():
         )
 
         text = _gemini_request(prompt)
-        return _jsonify({'analysis': text, 'code': code})
+        _gemini_cache[code_hash] = text
+        return jsonify({'analysis': text, 'code': code})
 
     except Exception as e:
-        return _jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @application.route('/generateProtocol/', methods=['POST'])
@@ -2479,49 +2562,70 @@ def generateProtocol():
     """
     Recibe un prompt en lenguaje natural y devuelve el AST JSON
     del protocolo generado por Gemini para el Architect.
+    Usa responseMimeType=application/json para output estructurado.
     Body JSON: { "prompt": "..." }
     """
-    from flask import request as _request, jsonify as _jsonify
     try:
-        prompt_text = _request.get_json().get('prompt', '').strip()
+        client_ip = request.remote_addr or 'unknown'
+        if not _gemini_rate_ok(client_ip):
+            return jsonify({'error': 'Demasiadas peticiones. Espera un minuto.'}), 429
+
+        prompt_text = request.get_json().get('prompt', '').strip()
         if not prompt_text:
-            return _jsonify({'error': 'No se recibió prompt'}), 400
+            return jsonify({'error': 'No se recibió prompt'}), 400
 
         system_prompt = (
             'Eres un copiloto experto en automatización de biorreactores Chi.Bio.\n'
             'Traduce las instrucciones en lenguaje natural a un array de objetos JSON que representa el AST del protocolo.\n'
             'DEBES responder ÚNICAMENTE con un array JSON válido. Nada de texto extra, ni markdown.\n\n'
-            'Bloques permitidos:\n'
-            '- "init_temp": {"type":"init_temp","temp":Float}\n'
-            '- "init_od": {"type":"init_od","od":Float}\n'
-            '- "init_stir": {"type":"init_stir","speed":Float}\n'
-            '- "thermostat": {"type":"thermostat","temp":Float}\n'
-            '- "ramp_temp": {"type":"ramp_temp","temp_start":Float,"temp_end":Float,"duration":Int}\n'
+            'Bloques permitidos y rangos exactos:\n'
+            '- "init_temp": {"type":"init_temp","temp":Float} — temp en [25.0, 50.0] °C. SIEMPRE primer bloque.\n'
+            '- "init_od": {"type":"init_od","od":Float} — od en [0.01, 2.0]. SIEMPRE segundo bloque.\n'
+            '- "init_stir": {"type":"init_stir","speed":Float} — speed en [0.0, 1.0] (0.5 es estándar). SIEMPRE tercer bloque.\n'
+            '- "thermostat": {"type":"thermostat","temp":Float} — temp en [25.0, 50.0]\n'
+            '- "ramp_temp": {"type":"ramp_temp","temp_start":Float,"temp_end":Float,"duration":Int} — duration en ciclos >= 1 (30 ciclos ≈ 1 min). NUNCA duration=0.\n'
             '- "led": {"type":"led","led":String,"power":Float,"mode":String,"duration":Float,"unit":String}\n'
-            '- "uv": {"type":"uv","power":Float,"mode":String,"duration":Float,"unit":String}\n'
-            '- "pump": {"type":"pump","pump":String,"power":Float,"duration":Float}\n'
-            '- "turbidostat": {"type":"turbidostat","state":String}\n'
-            '- "chemostat": {"type":"chemostat","state":String,"p1":Float,"p2":Float}\n'
-            '- "zigzag": {"type":"zigzag","state":String,"zig":Float}\n'
-            '- "wait": {"type":"wait","duration":Float,"unit":String}\n'
-            '- "loop": {"type":"loop","count":Int,"children":[]}\n'
-            '- "trigger": {"type":"trigger","tvar":String,"op":String,"val":Float,"behavior":String,"children":[]}\n'
+            '  led DEBE ser uno de: "LEDB" (457nm azul), "LEDC" (500nm), "LEDD" (523nm verde), "LEDF" (623nm), "LEDG" (blanco 6500K), "LEDH" (600nm), "LEDI" (550nm). NUNCA "blue", "red", "green" u otros.\n'
+            '  power en [0.0, 1.0] — 0.1=10%, 0.5=50%, 1.0=100%. Convierte siempre porcentajes: 20%→0.2, 50%→0.5. NUNCA valores > 1.0.\n'
+            '  mode en ["pulse", "on", "off"]. Con tiempo SIEMPRE mode="pulse". unit en ["sec" (max 15s), "min"].\n'
+            '- "uv": {"type":"uv","power":Float,"mode":String,"duration":Float,"unit":String} — mismos rangos que led.\n'
+            '- "pump": {"type":"pump","pump":String,"duration":Float} — pump en ["Pump1","Pump2","Pump3","Pump4"] (NUNCA "1","2","3","4"). duration en segundos (max 20). Las bombas son on/off; el caudal se calibra aparte, NO uses "power".\n'
+            '- "turbidostat": {"type":"turbidostat","state":"on"}\n'
+            '- "chemostat": {"type":"chemostat","state":"on","p1":Float,"p2":Float} — p1 y p2 en [0.0, 1.0], p2 > p1.\n'
+            '- "zigzag": {"type":"zigzag","state":"on","zig":Float} — zig en [0.01, 0.5]\n'
+            '- "wait": {"type":"wait","duration":Float,"unit":String} — unit en ["sec" (max 15), "min", "gen"]\n'
+            '- "loop": {"type":"loop","count":Int,"children":[...bloques...]} — children NUNCA vacío. count >= 2.\n'
+            '  Ejemplo de loop correcto: {"type":"loop","count":5,"children":[{"type":"led","led":"LEDB","power":0.5,"mode":"pulse","duration":1,"unit":"min"},{"type":"wait","duration":2,"unit":"min"}]}\n'
+            '- "trigger": {"type":"trigger","tvar":String,"op":String,"val":Float,"behavior":String,"children":[...bloques...]}\n'
+            '  tvar DEBE ser exactamente uno de (respeta mayúsculas): "OD", "GrowthRate", "Temp", "FP1", "FP2", "FP3", "Generations". NUNCA "pH", "od" u otras variables no listadas.\n'
+            '  op DEBE ser exactamente uno de: ">", "<", ">=", "<=", "==". NUNCA "gt", "lt", "ge", "le", "eq".\n'
+            '  behavior en ["wait", "if"].\n'
             '- "log": {"type":"log","msg":String}\n\n'
             'REGLAS:\n'
-            '1. Solo UN modo de control (turbidostat, chemostat o zigzag).\n'
-            '2. init_temp, init_od, init_stir solo pueden aparecer UNA vez.\n'
-            '3. Para esperas usa behavior "wait". Solo "if" si el usuario lo pide explícitamente.\n'
-            '4. LEDs por tiempo: mode="pulse". NO uses mode="on" con tiempo.\n'
-            '5. NO generes la propiedad "id".'
+            '1. SIEMPRE incluir init_temp, init_od, init_stir como primeros 3 bloques. Son obligatorios.\n'
+            '2. Solo UN modo de control (turbidostat, chemostat o zigzag). NUNCA dos a la vez.\n'
+            '3. init_temp, init_od, init_stir solo pueden aparecer UNA vez cada uno.\n'
+            '4. LEDs con tiempo: mode="pulse". NO uses mode="on" con tiempo.\n'
+            '5. NO generes la propiedad "id".\n'
+            '6. En "loop": children SIEMPRE contiene al menos un bloque. NUNCA "children":[].\n'
+            '7. Convierte porcentajes a decimales: 20%→0.2, 50%→0.5, 100%→1.0.\n'
+            '8. Agitación (speed) y potencias (power) siempre en [0.0, 1.0]. Nunca RPM ni valores absolutos.\n'
+            '9. En un trigger con behavior="wait": los children son acciones que se ejecutan cuando la condición YA se cumplió. NUNCA incluyas un bloque "wait" dentro de children de un trigger behavior="wait" — esa espera ya la gestiona el propio trigger.\n'
+            '10. Antes de generar un "loop", cuenta explícitamente los bloques que el usuario describió dentro de él. children debe contener EXACTAMENTE esos bloques, en orden, sin omitir ninguno.\n'
+            '11. NO generes la propiedad "power" en bloques "pump". Las bombas son on/off.\n'
+            '12. Convierte horas a minutos para el campo duration: 1 hora=60 min, 2 horas=120 min, 0.5 horas=30 min. Usa siempre unit="min".\n'
+            '13. init_temp, init_od, init_stir SOLO pueden aparecer UNA VEZ en todo el array. NUNCA los repitas ni los generes con valores distintos en otro punto del array.'
         )
 
-        text = _gemini_request(prompt_text, system_prompt)
-        # Limpiar posibles backticks de markdown
-        text = text.replace('```json', '').replace('```', '').strip()
-        return _jsonify({'ast': text})
+        text = _gemini_request(prompt_text, system_prompt, use_json_mode=True)
+        text_clean = text.strip()
+        if text_clean.startswith('```'):
+            text_clean = text_clean.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+        parsed = json.loads(text_clean)
+        return jsonify({'ast': json.dumps(parsed, ensure_ascii=False)})
 
     except Exception as e:
-        return _jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
 
 @application.route('/injectProtocol/', methods=['POST'])
@@ -2532,33 +2636,53 @@ def injectProtocol():
     y ejecuta automáticamente en el próximo ciclo.
     Body JSON: { "code": "..." }
     """
-    from flask import request as _request, jsonify as _jsonify
-    import os as _os
     try:
-        data = _request.get_json()
-        code = data.get('code', '').strip()
+        data = request.get_json()
+        code = (data or {}).get('code', '').strip()
 
         if not code:
-            return _jsonify({'error': 'No se recibió código'}), 400
+            return jsonify({'error': 'No se recibió código'}), 400
 
-        proto_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), 'protocolo.py')
-        with open(proto_path, 'w') as f:
+        # El compilador FSM genera un snippet que empieza con `elif` indentado.
+        # _nexus_exec transforma eso antes de ejecutar; replicamos la misma
+        # transformación aquí para que compile() valide el código real.
+        _lines = code.split('\n')
+        _fixed = []
+        _first_elif = False
+        for _l in _lines:
+            if not _first_elif and _l.strip().startswith('elif (program'):
+                _l = _l.replace('elif (program', 'if (program', 1)
+                _first_elif = True
+            if _l.startswith('    '):
+                _l = _l[4:]
+            _fixed.append(_l)
+        _executable = '\n'.join(_fixed)
+        try:
+            compile(_executable, '<protocol>', 'exec')
+        except SyntaxError as syn:
+            return jsonify({'error': 'Sintaxis inválida: ' + str(syn)}), 400
+
+        proto_dir  = os.path.dirname(os.path.abspath(__file__))
+        proto_path = os.path.join(proto_dir, 'protocolo.py')
+        tmp_path   = proto_path + '.tmp'
+
+        with open(tmp_path, 'w', encoding='utf-8') as f:
             f.write(code)
+        os.replace(tmp_path, proto_path)
 
         _cloud['status']        = 'ok'
         _cloud['inject_count'] += 1
 
         print(str(datetime.now()) + ' [NEXUS] Protocolo guardado en ' + proto_path)
-        return _jsonify({'ok': True, 'path': proto_path})
+        return jsonify({'ok': True, 'path': proto_path})
 
     except Exception as e:
-        return _jsonify({'error': str(e)}), 500
+        return jsonify({'error': str(e)}), 500
 
+
+initialiseAll()
 
 if __name__ == '__main__':
-    initialiseAll()
-    application.run(debug=True,threaded=True,host='192.168.7.2',port=5000)
-else:
-    initialiseAll()
+    application.run(debug=False, threaded=True, host='192.168.7.2', port=5000)
 
 print(str(datetime.now()) + ' Start Up Complete')

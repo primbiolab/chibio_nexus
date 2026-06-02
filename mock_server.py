@@ -19,6 +19,33 @@ import time
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
 
+# ── Gemini (opcional — requiere config.py con GEMINI_API_KEY) ────
+try:
+    from config import GEMINI_API_KEY
+    GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY
+    _GEMINI_OK = True
+except ImportError:
+    _GEMINI_OK = False
+
+def _gemini_request(prompt, system_prompt=None, use_json_mode=False):
+    import urllib.request as _req
+    import json as _json
+    contents = []
+    if system_prompt:
+        contents.append({'role': 'user', 'parts': [{'text': '<<system>>\n' + system_prompt}]})
+    contents.append({'role': 'user', 'parts': [{'text': prompt}]})
+    gen_config = {'temperature': 0.1}
+    if use_json_mode:
+        gen_config['responseMimeType'] = 'application/json'
+    body = _json.dumps({
+        'contents': contents,
+        'generationConfig': gen_config
+    }).encode('utf-8')
+    req = _req.Request(GEMINI_URL, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+    with _req.urlopen(req, timeout=30) as resp:
+        data = _json.loads(resp.read().decode('utf-8'))
+    return data['candidates'][0]['content']['parts'][0]['text']
+
 # ── Configuración ────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, 'templates')
@@ -181,7 +208,16 @@ def _build_sysdata(device_id: str) -> dict:
         'LASER650': {'name': 'LASER650', 'default': 0.5, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
         'UV'      : {'WL': 'UV',   'default': 0.5, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
 
-        'Terminal': {'text': f'[MOCK] {device_id} — Servidor de desarrollo activo\n[INFO] Simulando datos biológicos realistas\n[CICLO] t={int(t)}s'},
+        'Terminal': {'text': [
+            {'time': '12:04', 'msg': 'Cycle 3 Started'},
+            {'time': '12:03', 'msg': 'Cycle 2 Complete'},
+            {'time': '12:01', 'msg': '[MOCK] ' + device_id + ' activo'},
+            {'time': '12:01', 'msg': 'Cycle 2 Started'},
+            {'time': '12:00', 'msg': 'Cycle 1 Complete'},
+            {'time': '11:59', 'msg': 'Cycle 1 Started'},
+            {'time': '11:58', 'msg': 'Experiment Started'},
+            {'time': '11:57', 'msg': 'System Initialised'},
+        ]},
 
         'FP1': {'ON': 0, 'LED': 0, 'BaseBand': 0, 'Emit1Band': 0, 'Emit2Band': 0,
                 'Base': random.uniform(0, 0.1), 'Emit1': random.uniform(0, 0.05), 'Emit2': 0.0,
@@ -215,6 +251,10 @@ def _build_sysdata(device_id: str) -> dict:
 
 
 # ── Rutas Flask ──────────────────────────────────────────────────
+
+@app.route('/mobile-blocked')
+def mobile_blocked():
+    return render_template('mobile_blocked.html'), 403
 
 @app.route('/')
 def index():
@@ -267,21 +307,46 @@ def experimentReset():
     print(f'[MOCK] Experimento RESET en {_ui_device}')
     return ('', 204)
 
-# Endpoints de control — todos aceptan la petición y responden 204
+# Endpoints especializados — simulan cambio de estado visible en sysData
+@app.route('/Direction/<pump>/<M>', methods=['POST'])
+def direction(pump, M):
+    global _REACTOR_CFG, _ui_device
+    dev = M if M in _REACTOR_CFG else _ui_device
+    if pump == 'Pump1' and dev in _REACTOR_CFG:
+        _REACTOR_CFG[dev]['pump1'] *= -1
+    print(f'[MOCK] Dirección {pump} invertida en {dev}')
+    return ('', 204)
+
+@app.route('/SetFPMeasurement/<fp>/<exc>/<base>/<em1>/<em2>/<gain>', methods=['POST'])
+def setFPMeasurement(fp, exc, base, em1, em2, gain):
+    print(f'[MOCK] FP config: {fp} exc={exc} base={base} em1={em1} em2={em2} gain={gain}')
+    return ('', 204)
+
+@app.route('/CalibrateOD/<param>/<M>/<raw>/<actual>', methods=['POST'])
+def calibrateOD(param, M, raw, actual):
+    print(f'[MOCK] CalibrateOD {param} raw={raw} actual={actual} en {M}')
+    return ('', 204)
+
+@app.route('/GetSpectrum/<gain>/<M>', methods=['POST'])
+def getSpectrum(gain, M):
+    print(f'[MOCK] GetSpectrum gain={gain} en {M}')
+    return ('', 204)
+
+@app.route('/MeasureFP/<M>', methods=['POST'])
+def measureFP(M):
+    print(f'[MOCK] MeasureFP en {M}')
+    return ('', 204)
+
+# Endpoints de control genérico — aceptan la petición y responden 204
 _GENERIC_ENDPOINTS = [
-    '/SetOutputTarget/<param>/<int:a>/<val>',
-    '/SetOutputOn/<param>/<int:a>/<int:b>',
-    '/MeasureOD/<int:M>',
-    '/MeasureTemp/<sensor>/<int:M>',
-    '/CalibrateOD/<param>/<int:M>/<raw>/<actual>',
-    '/SetOutputTarget/Volume/<int:M>/<val>',
-    '/GetSpectrum/<gain>/<int:M>',
-    '/MeasureFP/<int:M>',
-    '/SetFPMeasurement/<fp>/<exc>/<base>/<em1>/<em2>/<gain>',
-    '/ClearTerminal/<int:M>',
-    '/SetCustom/<prog>/<int:state>',
+    '/SetOutputTarget/<param>/<a>/<val>',
+    '/SetOutputOn/<param>/<a>/<b>',
+    '/MeasureOD/<M>',
+    '/MeasureTemp/<sensor>/<M>',
+    '/SetOutputTarget/Volume/<M>/<val>',
+    '/ClearTerminal/<M>',
+    '/SetCustom/<prog>/<state>',
     '/SetLightActuation/<led>',
-    '/Direction/<pump>/<int:M>',
 ]
 
 def _generic_handler(**kwargs):
@@ -320,13 +385,64 @@ def analyzeProtocol():
 
 @app.route('/generateProtocol/', methods=['POST'])
 def generateProtocol():
-    mock_ast = (
-        '[{"type":"init_temp","temp":37.0},'
-        '{"type":"init_od","od":0.5},'
-        '{"type":"init_stir","speed":0.6},'
-        '{"type":"turbidostat","state":"on"}]'
-    )
-    return jsonify({'ast': mock_ast})
+    if not _GEMINI_OK:
+        return jsonify({'error': 'config.py con GEMINI_API_KEY no encontrado. Crea el archivo con tu API key de Google.'}), 500
+    try:
+        prompt_text = request.get_json().get('prompt', '').strip()
+        if not prompt_text:
+            return jsonify({'error': 'No se recibió prompt'}), 400
+        system_prompt = (
+            'Eres un copiloto experto en automatización de biorreactores Chi.Bio.\n'
+            'Traduce las instrucciones en lenguaje natural a un array de objetos JSON que representa el AST del protocolo.\n'
+            'DEBES responder ÚNICAMENTE con un array JSON válido. Nada de texto extra, ni markdown.\n\n'
+            'Bloques permitidos y rangos exactos:\n'
+            '- "init_temp": {"type":"init_temp","temp":Float} — temp en [25.0, 50.0] °C. SIEMPRE primer bloque.\n'
+            '- "init_od": {"type":"init_od","od":Float} — od en [0.01, 2.0]. SIEMPRE segundo bloque.\n'
+            '- "init_stir": {"type":"init_stir","speed":Float} — speed en [0.0, 1.0] (0.5 es estándar). SIEMPRE tercer bloque.\n'
+            '- "thermostat": {"type":"thermostat","temp":Float} — temp en [25.0, 50.0]\n'
+            '- "ramp_temp": {"type":"ramp_temp","temp_start":Float,"temp_end":Float,"duration":Int} — duration en ciclos >= 1 (1 ciclo ≈ 1 min). NUNCA duration=0. Para "1 hora" usa duration=60, para "30 minutos" usa duration=30.\n'
+            '- "led": {"type":"led","led":String,"power":Float,"mode":String,"duration":Float,"unit":String}\n'
+            '  led DEBE ser uno de: "LEDB" (457nm azul), "LEDC" (500nm), "LEDD" (523nm verde), "LEDF" (623nm), "LEDG" (blanco 6500K), "LEDH" (600nm), "LEDI" (550nm). NUNCA "blue", "red", "green" u otros.\n'
+            '  power en [0.0, 1.0] — 0.1=10%, 0.5=50%, 1.0=100%. Convierte siempre porcentajes: 20%→0.2, 50%→0.5. NUNCA valores > 1.0.\n'
+            '  mode en ["pulse", "on", "off"]. Con tiempo SIEMPRE mode="pulse". unit en ["sec" (max 15s), "min"].\n'
+            '- "uv": {"type":"uv","power":Float,"mode":String,"duration":Float,"unit":String} — mismos rangos que led.\n'
+            '- "pump": {"type":"pump","pump":String,"duration":Float} — pump en ["Pump1","Pump2","Pump3","Pump4"] (NUNCA "1","2","3","4"). duration en segundos (max 20). Las bombas son on/off; el caudal se calibra aparte, NO uses "power".\n'
+            '- "turbidostat": {"type":"turbidostat","state":"on"}\n'
+            '- "chemostat": {"type":"chemostat","state":"on","p1":Float,"p2":Float} — p1 y p2 en [0.0, 1.0], p2 > p1.\n'
+            '- "zigzag": {"type":"zigzag","state":"on","zig":Float} — zig en [0.01, 0.5]\n'
+            '- "wait": {"type":"wait","duration":Float,"unit":String} — unit en ["sec" (max 15), "min", "gen"]\n'
+            '- "loop": {"type":"loop","count":Int,"children":[...bloques...]} — children NUNCA vacío. count >= 2. Los bloques que se repiten van DENTRO de children, no fuera.\n'
+            '  Ejemplo de loop correcto: {"type":"loop","count":5,"children":[{"type":"led","led":"LEDB","power":0.5,"mode":"pulse","duration":1,"unit":"min"},{"type":"wait","duration":2,"unit":"min"}]}\n'
+            '- "trigger": {"type":"trigger","tvar":String,"op":String,"val":Float,"behavior":String,"children":[...bloques...]}\n'
+            '  tvar DEBE ser exactamente uno de (respeta mayúsculas): "OD", "GrowthRate", "Temp", "FP1", "FP2", "FP3", "Generations". NUNCA "pH", "od" u otras variables no listadas.\n'
+            '  op DEBE ser exactamente uno de: ">", "<", ">=", "<=", "==". NUNCA "gt", "lt", "ge", "le", "eq".\n'
+            '  behavior en ["wait", "if"]. Las acciones condicionales van DENTRO de children.\n'
+            '- "log": {"type":"log","msg":String}\n\n'
+            'REGLAS:\n'
+            '1. SIEMPRE incluir init_temp, init_od, init_stir como primeros 3 bloques. Son obligatorios.\n'
+            '2. Solo UN modo de control (turbidostat, chemostat o zigzag). NUNCA dos a la vez.\n'
+            '3. init_temp, init_od, init_stir solo pueden aparecer UNA vez cada uno.\n'
+            '4. LEDs con tiempo: mode="pulse". NO uses mode="on" con tiempo.\n'
+            '5. NO generes la propiedad "id".\n'
+            '6. En "loop": children SIEMPRE contiene al menos un bloque. NUNCA "children":[]. NO pierdas bloques que el usuario describió dentro del loop.\n'
+            '7. En "trigger": children SIEMPRE contiene los bloques de acción descritos. NO pierdas LEDs, pumps o logs que el usuario asocie al disparo.\n'
+            '8. Convierte porcentajes a decimales: 20%→0.2, 50%→0.5, 60%→0.6, 100%→1.0.\n'
+            '9. Agitación (speed) y potencias (power) siempre en [0.0, 1.0]. Nunca RPM ni valores absolutos.\n'
+            '10. Preserva TODOS los pasos del usuario en orden. No omitas esperas, logs, ni acciones intermedias.\n'
+            '11. En un trigger con behavior="wait": los children son acciones que se ejecutan cuando la condición YA se cumplió. NUNCA incluyas un bloque "wait" dentro de children de un trigger behavior="wait" — esa espera ya la gestiona el propio trigger.\n'
+            '12. Antes de generar un "loop", cuenta explícitamente los bloques que el usuario describió dentro de él. children debe contener EXACTAMENTE esos bloques, en orden, sin omitir ninguno.\n'
+            '13. Convierte horas a minutos para el campo duration: 1 hora=60 min, 2 horas=120 min, 0.5 horas=30 min. Usa siempre unit="min".\n'
+            '14. init_temp, init_od, init_stir SOLO pueden aparecer UNA VEZ en todo el array. NUNCA los repitas ni los generes con valores distintos en otro punto del array.'
+        )
+        import json as _json
+        text = _gemini_request(prompt_text, system_prompt, use_json_mode=True)
+        text_clean = text.strip()
+        if text_clean.startswith('```'):
+            text_clean = text_clean.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
+        parsed = _json.loads(text_clean)
+        return jsonify({'ast': _json.dumps(parsed, ensure_ascii=False)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/injectProtocol/', methods=['POST'])
 def injectProtocol():
@@ -358,4 +474,4 @@ if __name__ == '__main__':
     print(f'  Static            : {STATIC_DIR}')
     print(f'  URL               : http://localhost:5000')
     print('='*55 + '\n')
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='127.0.0.1', port=5000)

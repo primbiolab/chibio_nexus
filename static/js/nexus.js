@@ -1,6 +1,27 @@
 /* ── Nexus Main JS — extraído de index.html ────────────────────── */
-/* Iniciar polling de datos del sistema */
-setInterval(getSysData, 2000);
+/* Polling de datos del sistema con backoff exponencial y pausa en tab oculto */
+var _pollInterval = 2000;
+var _pollTimer    = null;
+var _pollBusy     = false;
+
+function _pollTick() {
+  clearTimeout(_pollTimer); _pollTimer = null;
+  if (_pollBusy) return;                 // ya hay un GET en vuelo; su 'complete' reprograma
+  if (document.hidden) { _pollTimer = setTimeout(_pollTick, 2000); return; }
+  _pollBusy = true;
+  $.ajax({
+    type: 'GET', url: '/getSysdata/', dataType: 'json', timeout: 5000,
+    success: function(data) { _pollInterval = 2000; updateData(data); _updateCloudPill(data.cloud); },
+    error:   function() { _pollInterval = Math.min(_pollInterval * 2, 30000); },
+    complete:function() { _pollBusy = false; _pollTimer = setTimeout(_pollTick, _pollInterval); }
+  });
+}
+
+document.addEventListener('visibilitychange', function() {
+  if (!document.hidden) { clearTimeout(_pollTimer); _pollInterval = 2000; _pollTick(); }
+});
+
+_pollTick();
 
 // ── Nexus Tab Navigation ──────────────────────────────────
 var _nexusTab = 'main';
@@ -335,6 +356,7 @@ function _parseRecordStr(s){
 }
 
 function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,seriesNames){
+  if(typeof google==='undefined'||!google.visualization)return;
   var containerId='chart_div'+chartNum;
   var el=document.getElementById(containerId);
   if(!el)return;
@@ -514,7 +536,16 @@ function toast(m, t) {
   spawnToast(t || 'ok', null, m, null, 3200);
 }
 
-function ajax(u,cb){$.ajax({type:'POST',url:u,success:function(r){if(cb)cb(r);getSysData();},error:function(){spawnToast('err',null,'Error de Red','No se pudo conectar al servidor.');}});}
+function ajax(u,cb){
+  $.ajax({
+    type:'POST', url:u, timeout:5000,
+    success:function(r){ if(cb)cb(r); _pollTick(); },
+    error:function(xhr,status){
+      if(status==='timeout') spawnToast('err',null,'Timeout','El reactor tardó demasiado en responder.',4000);
+      else spawnToast('err',null,'Error de Red','No se pudo conectar al servidor.',4000);
+    }
+  });
+}
 
 /* ── CSV EXPORT ────────────────────────────────────────────── */
 function exportToCSV() {
@@ -630,11 +661,15 @@ async function analyzeProtocol(){
   btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Analizando...';
   res.innerHTML = '<span style="color:var(--tx3);font-style:italic;">Consultando al reactor...</span>';
 
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 35000);
+
   try {
     var resp = await fetch('/analyzeProtocol/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
+      signal: ctrl.signal
     });
     if(!resp.ok) throw new Error('Error ' + resp.status);
     var data = await resp.json();
@@ -647,12 +682,21 @@ async function analyzeProtocol(){
       .map(function(p){ return '<p style="margin-bottom:8px;">' + p + '</p>'; })
       .join('');
     res.innerHTML = html;
-    spawnToast('ok', null, 'Análisis listo', 'Protocolo interpretado correctamente.', 3500);
+    if(data.cached) spawnToast('info', null, 'Análisis listo', 'Resultado del caché (protocolo sin cambios).', 3000);
+    else spawnToast('ok', null, 'Análisis listo', 'Protocolo interpretado correctamente.', 3500);
 
   } catch(e) {
-    res.innerHTML = '<span style="color:var(--rd)"><i class="fa-solid fa-triangle-exclamation"></i> Error: ' + e.message + '</span>';
+    var errMsg = document.createElement('span');
+    errMsg.style.color = 'var(--rd)';
+    var icon = document.createElement('i');
+    icon.className = 'fa-solid fa-triangle-exclamation';
+    errMsg.appendChild(icon);
+    errMsg.appendChild(document.createTextNode(' Error: ' + e.message));
+    res.innerHTML = '';
+    res.appendChild(errMsg);
     spawnToast('err', null, 'Error', e.message, 5000);
   } finally {
+    clearTimeout(timer);
     btn.disabled = false;
     btn.innerHTML = '<i class="fa-solid fa-robot"></i> Analizar protocolo activo';
   }
@@ -681,8 +725,20 @@ function setOD(){ajax('/SetOutputTarget/OD/0/'+$('#ODInput').val(),null);}
 function measureOD(){ajax('/MeasureOD/0',null);}
 function calibrateOD(){ajax('/CalibrateOD/OD0/0/'+$('#OD0Input').val()+'/'+$('#OD0Actual').val(),null);}
 function setVolume(){ajax('/SetOutputTarget/Volume/0/'+$('#VolumeInput').val(),null);}
-function toggleODRegulate(){ajax('/SetOutputOn/OD/2/0',null);}
-function toggleZigzag(){ajax('/SetOutputOn/Zigzag/2/0',null);}
+function toggleODRegulate(){
+  var odOn = _lastData && _lastData.OD && _lastData.OD.ON === 1;
+  ajax('/SetOutputOn/OD/2/0', null);
+  if (!odOn) {
+    _mb('Zigzag', false, 'on');
+  }
+}
+function toggleZigzag(){
+  var zzOn = _lastData && _lastData.Zigzag && _lastData.Zigzag.ON === 1;
+  ajax('/SetOutputOn/Zigzag/2/0', null);
+  if (!zzOn) {
+    _mb('ODRegulate', false, 'on');
+  }
+}
 function measureTemp(w){ajax('/MeasureTemp/'+w+'/0',null);}
 function setThermostat(){ajax('/SetOutputTarget/Thermostat/0/'+$('#ThermostatInput').val(),null);}
 function toggleThermostat(){ajax('/SetOutputOn/Thermostat/2/0',null);}
@@ -699,46 +755,144 @@ function adjLED(l,delta){
   ajax('/SetOutputTarget/'+l+'/0/'+v,null);
 }
 function switchLED(l,on){if(window._updatingLED)return;ajax('/SetOutputOn/'+l+'/'+(on?1:0)+'/0',null);}
+var _pumpDir={Pump1:1,Pump2:1,Pump3:1,Pump4:1};
 function switchPump(p){ajax('/SetOutputOn/'+p+'/2/0',null);}
+function switchPumpToggle(p,on){ajax('/SetOutputOn/'+p+'/'+(on?1:0)+'/0',null);}
 function dirPump(p){ajax('/Direction/'+p+'/0',null);}
+function setPump(p){
+  var raw=parseFloat($('#'+p+'Input').val());
+  if(isNaN(raw))return;
+  var v=Math.max(-1,Math.min(1,raw));
+  ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+}
+function adjPump(p,delta){
+  var inp=$('#'+p+'Input');
+  var current=parseFloat(inp.val()||0);
+  var sign=(_pumpDir[p]||1)<0?-1:1;
+  if(current<0)sign=-1; else if(current>0)sign=1;
+  var mag=Math.round((Math.abs(current)+delta)*10)/10;
+  mag=Math.max(0,Math.min(1,mag));
+  var v=sign*mag;
+  inp.val(v.toFixed(1));
+  ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+}
 function measureSpectrum(){ajax('/GetSpectrum/'+$('#SpectrumGain').val()+'/0',null);}
 function measureFP(){ajax('/MeasureFP/0',null);}
 function toggleFP(fp){var n=fp.slice(2);ajax('/SetFPMeasurement/'+fp+'/'+$('#FPExcite'+n).val()+'/'+$('#FPBase'+n).val()+'/'+$('#FPEmit'+n+'A').val()+'/'+$('#FPEmit'+n+'B').val()+'/'+$('#FPGain'+n).val(),null);}
 function clearTerm(){ajax('/ClearTerminal/0',null);}
 
-/* ── Cloud pill — pulso azul durante descarga ───── */
-var _cloudPrev = '';
-setInterval(function(){
-  if(_nexusTab !== 'main') return;
-  $.ajax({type:'GET',url:'/getCloudStatus/',dataType:'json',
-    success:function(d){
-      var p=document.getElementById('cloud-pill');
-      if(!p) return;
-      var t=document.getElementById('cloud-pill-text');
-      var ico=document.getElementById('cloud-ico');
-      p.className='cpill';
-      ico.className='fa-solid fa-cloud cloud-ico';
-      if(d.status==='downloading'||d.has_pending){
-        p.classList.add('downloading');
-        ico.className='fa-solid fa-arrows-rotate cloud-ico'; /* icono giratorio */
-        t.textContent='Descargando...';
-      }else if(d.status==='ok'){
-        p.classList.add('ok');
-        t.textContent='Cloud #'+d.inject_count;
-        if(_cloudPrev!=='ok')toast('Protocolo inyectado! #'+d.inject_count,'ok');
-      }else if(d.status==='new'){
-        p.classList.add('new');
-        t.textContent='Nuevo protocolo!';
-      }else if(d.status==='error'){
-        p.classList.add('err');
-        t.textContent='Error Cloud';
-      }else{
-        t.textContent='Cloud';
+/* ── Terminal — render agrupado por ciclo ───────── */
+function renderTerminal(entries){
+  var el=document.getElementById('termI');
+  if(!el)return;
+  if(!Array.isArray(entries)||entries.length===0){
+    el.innerHTML='<span class="term-empty">Sin actividad registrada</span>';
+    return;
+  }
+  var MSGS={
+    'System Initialised':                   'Sistema inicializado',
+    'Terminal Cleared':                     'Terminal reiniciada',
+    'Experiment Started':                   'Experimento iniciado',
+    'Experiment Stopped':                   'Experimento detenido',
+    'Experiment Stopping at end of cycle':  'Detención al final del ciclo',
+    'Protocolo Finalizado':                 'Protocolo finalizado',
+    'Experiment Cycle Time is too short!!!':'Tiempo de ciclo demasiado corto'
+  };
+  function xlate(m){return MSGS[m]||m;}
+
+  var oldest=entries.slice().reverse();
+  var groups=[];
+  var sistemaGroup=null;
+  var curCycle=null;
+
+  for(var i=0;i<oldest.length;i++){
+    var e=oldest[i];
+    var csM=e.msg.match(/^Cycle (\d+) Started$/);
+    var ccM=e.msg.match(/^Cycle (\d+) Complete$/);
+    if(csM){
+      curCycle={type:'cycle',num:parseInt(csM[1]),events:[e],complete:false};
+      groups.push(curCycle);
+    } else if(ccM){
+      if(curCycle){curCycle.events.push(e);curCycle.complete=true;}
+      curCycle=null;
+    } else {
+      if(curCycle){
+        curCycle.events.push(e);
+      } else {
+        if(!sistemaGroup){
+          sistemaGroup={type:'sistema',events:[]};
+          groups.unshift(sistemaGroup);
+        }
+        sistemaGroup.events.push(e);
       }
-      _cloudPrev=d.status;
     }
-  });
-},1500);
+  }
+
+  var cycles=groups.filter(function(g){return g.type==='cycle';}).reverse();
+  var sysG=null;
+  for(var k=0;k<groups.length;k++){if(groups[k].type==='sistema'){sysG=groups[k];break;}}
+  var ordered=sysG?cycles.concat([sysG]):cycles;
+
+  var h='';
+  for(var gi=0;gi<ordered.length;gi++){
+    var g=ordered[gi];
+    if(g.type==='cycle'){
+      var act=!g.complete;
+      var hcls=act?'term-hdr-active':'term-hdr-done';
+      var badge=act
+        ?'<span class="term-badge term-badge-active"><span class="term-dot"></span>En curso</span>'
+        :'<span class="term-badge term-badge-done">✓ Completado</span>';
+      h+='<div class="term-group"><div class="term-group-hdr '+hcls+'"><span class="term-group-label">Ciclo '+g.num+'</span>'+badge+'</div>';
+      for(var ei=0;ei<g.events.length;ei++){
+        var ev=g.events[ei];
+        var isSE=/^Cycle \d+ (Started|Complete)$/.test(ev.msg);
+        var mtext=isSE?(/Started/.test(ev.msg)?'Ciclo iniciado':'Ciclo completado'):xlate(ev.msg);
+        var mcls=isSE?'term-msg term-msg-dim':'term-msg';
+        h+='<div class="term-entry"><span class="term-time">'+ev.time+'</span><span class="'+mcls+'">'+mtext+'</span></div>';
+      }
+      h+='</div>';
+    } else {
+      h+='<div class="term-group"><div class="term-group-hdr term-hdr-sys"><span class="term-group-label">Sistema</span></div>';
+      for(var ei2=0;ei2<g.events.length;ei2++){
+        var ev2=g.events[ei2];
+        h+='<div class="term-entry"><span class="term-time">'+ev2.time+'</span><span class="term-msg">'+xlate(ev2.msg)+'</span></div>';
+      }
+      h+='</div>';
+    }
+  }
+  el.innerHTML=h;
+}
+
+/* ── Cloud pill — pulso azul durante descarga ───── */
+/* Actualizado desde el campo `cloud` de /getSysdata/ (ver _pollTick), sin poller propio. */
+var _cloudPrev = '';
+function _updateCloudPill(d){
+  if(_nexusTab !== 'main' || !d) return;
+  var p=document.getElementById('cloud-pill');
+  if(!p) return;
+  var t=document.getElementById('cloud-pill-text');
+  var ico=document.getElementById('cloud-ico');
+  p.className='cpill';
+  ico.className='fa-solid fa-cloud cloud-ico';
+  if(d.status==='downloading'||d.has_pending){
+    p.classList.add('downloading');
+    ico.className='fa-solid fa-arrows-rotate cloud-ico'; /* icono giratorio */
+    t.textContent='Descargando...';
+  }else if(d.status==='ok'){
+    p.classList.add('ok');
+    t.textContent='Cloud #'+d.inject_count;
+    if(_cloudPrev!=='ok')toast('Protocolo inyectado! #'+d.inject_count,'ok');
+  }else if(d.status==='new'){
+    p.classList.add('new');
+    t.textContent='Nuevo protocolo!';
+  }else if(d.status==='error'){
+    p.classList.add('err');
+    t.textContent='Error Cloud';
+  }else{
+    t.textContent='Cloud';
+  }
+  _cloudPrev=d.status;
+}
 
 /* ── Helpers internos ───────────────────────────── */
 function _mb(id,on,cls){var e=document.getElementById(id);if(!e)return;e.classList.remove('on','on-rd','on-am','on-pu');if(on)e.classList.add(cls||'on');}
@@ -747,6 +901,13 @@ function _mb(id,on,cls){var e=document.getElementById(id);if(!e)return;e.classLi
    updateData — puente con HTMLScripts.js
 ══════════════════════════════════════════════════ */
 function updateData(data){
+  if(!data || !data.Experiment || !data.OD) {
+    spawnToast('warn', null, 'Datos incompletos', 'Respuesta inesperada del servidor. Reintentando...', 3000);
+    return;
+  }
+  try { _updateDataInner(data); } catch(e) { console.warn('updateData error:', e); }
+}
+function _updateDataInner(data){
   var running=Boolean(data.Experiment.ON),measuring=Boolean(data.OD.Measuring);
 
   /* Topbar */
@@ -802,7 +963,15 @@ function updateData(data){
   document.getElementById('CustomStatus').textContent=fsmSt.toFixed(1);
   document.getElementById('custom-prog-badge').textContent=data.Custom.Program||'C1';
   var fsmOn=data.Custom.ON===1;
-  _mb('CustomSwitch',fsmOn,'on-pu');
+  /* Toggle visual del botón Run: verde/play cuando inactivo, rojo/stop cuando activo */
+  var cswBtn=document.getElementById('CustomSwitch');
+  if(cswBtn){
+    cswBtn.classList.remove('ib-gr','ib-rd');
+    cswBtn.classList.add(fsmOn ? 'ib-rd' : 'ib-gr');
+    cswBtn.innerHTML=fsmOn
+      ? '<i class="fa-solid fa-stop"></i> Detener'
+      : '<i class="fa-solid fa-play"></i> Iniciar';
+  }
   /* Glow más intenso cuando activo */
   document.getElementById('fsm-display').classList.toggle('active',fsmOn);
   /* Barra de estado (ejemplo: estado/10 como porcentaje) */
@@ -820,37 +989,48 @@ function updateData(data){
     var cur=document.getElementById(l+'Current');if(cur)cur.textContent=data[l].target.toFixed(2);
     var row=document.getElementById('led-row-'+l);if(row)row.classList.toggle('on',on);
     var tog=document.getElementById(l+'-tog');if(tog){window._updatingLED=true;tog.checked=on;window._updatingLED=false;}
+    /* Poblar el input de potencia (sin pisar al usuario mientras escribe) para que "Set" no envíe vacío */
+    var inp=document.getElementById(l+'Input');
+    if(inp&&document.activeElement!==inp){inp.value=data[l].target.toFixed(1);}
   });
 
-  /* Detección de versión de hardware LED — muestra/oculta filas según V1 o V2 */
+  /* Opciones de LED — la fila 6500K (LEDG) se muestra siempre, igual que el software original.
+     La autodetección de versión en backend ya no controla la visibilidad de la UI. */
   if (!window._ledVersionApplied || window._ledVersionApplied !== data.UIDevice) {
     window._ledVersionApplied = data.UIDevice;
-    var isV1 = data.Version && data.Version.LED === 1;
     var ledRowG = document.getElementById('led-row-LEDG');
-    if (ledRowG) ledRowG.style.display = isV1 ? '' : 'none';
-    /* Actualizar opciones de excitación en FP según hardware */
-    var ledOptsV1 = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
-                     {v:'LEDF',t:'623nm'},{v:'LEDG',t:'6500K'},{v:'LASER650',t:'Láser'}];
-    var ledOptsV2 = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
-                     {v:'LEDF',t:'623nm'},{v:'LASER650',t:'Láser'}];
-    var opts = isV1 ? ledOptsV1 : ledOptsV2;
-    var optsHtml = opts.map(function(o){return '<option value="'+o.v+'">'+o.t+'</option>';}).join('');
+    if (ledRowG) ledRowG.style.display = '';
+    /* Opciones de excitación en FP — incluyen 6500K */
+    var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
+                   {v:'LEDF',t:'623nm'},{v:'LEDG',t:'6500K'},{v:'LASER650',t:'Láser'}];
+    var optsHtml = ledOpts.map(function(o){return '<option value="'+o.v+'">'+o.t+'</option>';}).join('');
     ['FPExcite1','FPExcite2','FPExcite3'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.innerHTML=optsHtml;
     });
   }
 
-  /* Bombas — iluminación azul card + rows + texto botón On/Off */
+  /* Bombas */
   var anyPumpOn=false;
   for(var i=1;i<=4;i++){
     var pk='Pump'+i;if(!data[pk])continue;
     var pon=data[pk].ON===1;
     if(pon)anyPumpOn=true;
     document.getElementById('pump-row-'+i).classList.toggle('on',pon);
-    var swBtn=document.getElementById(pk+'Switch');
-    if(swBtn){swBtn.textContent=pon?'Off':'On';}
+    /* Toggle */
+    var tog=document.getElementById(pk+'Toggle');
+    if(tog&&tog!==document.activeElement){tog.checked=pon;}
+    /* Dirección */
+    var dir=(data[pk].direction!==undefined)?(data[pk].direction>=0?1:-1):1;
+    _pumpDir[pk]=dir;
+    var dirBtn=document.getElementById(pk+'Direction');
+    if(dirBtn)dirBtn.classList.toggle('on',dir<0);
+    /* Input — valor con signo, no pisar mientras el usuario escribe */
+    var pin=document.getElementById(pk+'Input');
+    if(pin&&document.activeElement!==pin){
+      var tgt=data[pk].target||0;
+      pin.value=(dir*Math.abs(tgt)).toFixed(1);
+    }
   }
-  /* Card completa de bombas se ilumina si alguna está on */
   document.getElementById('pumps-card').classList.toggle('pump-on',anyPumpOn);
 
   var turbOn=Boolean(data.OD.ON);
@@ -871,7 +1051,7 @@ function updateData(data){
   });
 
   /* Terminal */
-  document.getElementById('termI').textContent=data.Terminal.text;
+  renderTerminal(data.Terminal.text);
 
   /* Charts */
   _lastData = data;
@@ -884,68 +1064,66 @@ function updateData(data){
   if(_nexusTab === 'camera') _updateCamReactorInfo();
 }
 
-// ── Camera Settings ────────────────────────────────────────
+// ── Camera Settings (WebRTC) ───────────────────────────────
+
 var _camBase = (function(){
   var el = document.getElementById('nexus-camera');
   var base = el ? (el.getAttribute('data-cam-base') || '') : '';
-  return base.replace(/\/$/, '') || 'http://localhost:5001';
+  return base.replace(/\/$/, '') || 'http://localhost:8000';
 })();
 
-// Apuntar el feed al endpoint correcto en cuanto carga el DOM
-(function(){
+// Construir base WebSocket desde _camBase (http→ws, https→wss)
+var _wsBase = _camBase
+  .replace(/^https:\/\//, 'wss://')
+  .replace(/^http:\/\//, 'ws://');
+
+var _camWs          = null;   // WebSocket de señalización activo
+var _camPc          = null;   // RTCPeerConnection activo
+var _camReconnTimer = null;   // setTimeout de reconexión
+var _camDebounce    = null;   // debounce de sliders
+var _camPollTimer   = null;   // setInterval de polling /health
+
+// ── Aplicar filtros CSS al elemento de video ──
+function _applyCssFilter(){
   var feed = document.getElementById('cam-feed');
   if(!feed) return;
-  feed.onerror = function(){ _setCamStatus('offline'); };
-  feed.src = _camBase + '/video_feed';
-})();
+  var b = parseFloat(document.getElementById('cam-brightness').value) || 1.0;
+  var c = parseFloat(document.getElementById('cam-contrast').value)   || 1.0;
+  var s = parseFloat(document.getElementById('cam-saturation').value) || 1.0;
+  feed.style.filter = 'brightness(' + b + ') contrast(' + c + ') saturate(' + s + ')';
+}
 
-var _camDebounce = null;
-var _camPollTimer = null;
-
+// ── Slider handler: actualiza labels y aplica filtro CSS (sin POST) ──
 function onCamSlider(){
   var b = document.getElementById('cam-brightness');
   var c = document.getElementById('cam-contrast');
   var s = document.getElementById('cam-saturation');
-  var q = document.getElementById('cam-quality');
   if(b) document.getElementById('cam-brightness-val').textContent = parseFloat(b.value).toFixed(2);
   if(c) document.getElementById('cam-contrast-val').textContent   = parseFloat(c.value).toFixed(2);
   if(s) document.getElementById('cam-saturation-val').textContent = parseFloat(s.value).toFixed(2);
-  if(q) document.getElementById('cam-quality-val').textContent    = parseInt(q.value);
   clearTimeout(_camDebounce);
-  _camDebounce = setTimeout(_postCamSettings, 150);
+  _camDebounce = setTimeout(_applyCssFilter, 150);
 }
 
-function _postCamSettings(){
-  $.ajax({
-    url: _camBase + '/settings',
-    method: 'POST',
-    contentType: 'application/json',
-    data: JSON.stringify({
-      brightness:   parseFloat(document.getElementById('cam-brightness').value),
-      contrast:     parseFloat(document.getElementById('cam-contrast').value),
-      saturation:   parseFloat(document.getElementById('cam-saturation').value),
-      jpeg_quality: parseInt(document.getElementById('cam-quality').value)
-    }),
-    success: function(){ _setCamStatus('online'); },
-    error:   function(){ _setCamStatus('offline'); }
-  });
-}
-
+// ── Polling de /health: FPS, peers, estado online/offline ──
 function _fetchCamStatus(){
   $.ajax({
-    url: _camBase + '/settings',
+    url: _camBase + '/health',
     method: 'GET',
     timeout: 2000,
     success: function(data){
-      _applyCamSettings(data);
-      _setCamStatus(data.camera_status || 'online');
-      var fpsEl = document.getElementById('cam-fps-val');
-      if(fpsEl) fpsEl.textContent = (data.fps !== undefined) ? data.fps.toFixed(1) + ' fps' : '--';
+      _setCamStatus('online');
+      var fpsEl   = document.getElementById('cam-fps-val');
+      var peersEl = document.getElementById('cam-peers-val');
+      if(fpsEl)   fpsEl.textContent   = (data.fps   !== undefined) ? data.fps.toFixed(1) + ' fps' : '--';
+      if(peersEl) peersEl.textContent = (data.peers !== undefined) ? data.peers : '--';
     },
     error: function(){
       _setCamStatus('offline');
-      var fpsEl = document.getElementById('cam-fps-val');
-      if(fpsEl) fpsEl.textContent = '--';
+      var fpsEl   = document.getElementById('cam-fps-val');
+      var peersEl = document.getElementById('cam-peers-val');
+      if(fpsEl)   fpsEl.textContent   = '--';
+      if(peersEl) peersEl.textContent = '--';
     }
   });
 }
@@ -953,16 +1131,23 @@ function _fetchCamStatus(){
 function _startCamPoll(){
   _stopCamPoll();
   _fetchCamStatus();
-  _camPollTimer = setInterval(_fetchCamStatus, 1500);
+  _camPollTimer = setInterval(function(){
+    _fetchCamStatus();
+    _requestWsStats();
+  }, 1500);
 }
 
 function _stopCamPoll(){
   clearInterval(_camPollTimer);
   _camPollTimer = null;
+  _teardownWebRTC();
+  clearTimeout(_camReconnTimer);
+  _camReconnTimer = null;
 }
 
 function loadCameraSettings(){
   _startCamPoll();
+  _setupWebRTC();
   _updateCamReactorInfo();
 }
 
@@ -981,6 +1166,7 @@ window.addEventListener('orientationchange', function(){
   setTimeout(_checkCamOrientation, 150);
 });
 
+// ── _applyCamSettings: setea sliders y aplica CSS filter (usado en reset) ──
 function _applyCamSettings(data){
   function set(id, valId, val, fixed){
     var el = document.getElementById(id);
@@ -988,10 +1174,10 @@ function _applyCamSettings(data){
     if(el) el.value = val;
     if(vEl) vEl.textContent = fixed ? parseFloat(val).toFixed(2) : parseInt(val);
   }
-  set('cam-brightness', 'cam-brightness-val', data.brightness,   true);
-  set('cam-contrast',   'cam-contrast-val',   data.contrast,     true);
-  set('cam-saturation', 'cam-saturation-val', data.saturation,   true);
-  set('cam-quality',    'cam-quality-val',    data.jpeg_quality, false);
+  set('cam-brightness', 'cam-brightness-val', data.brightness, true);
+  set('cam-contrast',   'cam-contrast-val',   data.contrast,   true);
+  set('cam-saturation', 'cam-saturation-val', data.saturation, true);
+  _applyCssFilter();
 }
 
 function _setCamStatus(status){
@@ -1012,32 +1198,179 @@ function _updateCamReactorInfo(){
   badgeEl.className   = 'cam-exp-badge ' + (running ? 'running' : 'stopped');
 }
 
-function captureCamFrame(btn){
-  if(btn) btn.disabled = true;
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', _camBase + '/capture', true);
-  xhr.responseType = 'blob';
-  xhr.onload = function(){
-    if(xhr.status === 200){
-      var url = URL.createObjectURL(xhr.response);
-      var a = document.createElement('a');
-      var ts = new Date().toISOString().slice(0,19).replace(/[T:]/g,'-');
-      a.href = url;
-      a.download = 'chibio_' + ts + '.jpg';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-    if(btn) btn.disabled = false;
-  };
-  xhr.onerror = function(){ if(btn) btn.disabled = false; };
-  xhr.send();
+// ── Teardown completo de WebRTC ──
+function _teardownWebRTC(){
+  if(_camWs){
+    _camWs.onclose = null;
+    _camWs.onerror = null;
+    try { _camWs.close(); } catch(e){}
+    _camWs = null;
+  }
+  if(_camPc){
+    _camPc.onconnectionstatechange = null;
+    _camPc.onicecandidate = null;
+    _camPc.ontrack = null;
+    try { _camPc.close(); } catch(e){}
+    _camPc = null;
+  }
+  var feed = document.getElementById('cam-feed');
+  if(feed && feed.srcObject){
+    feed.srcObject.getTracks().forEach(function(t){ t.stop(); });
+    feed.srcObject = null;
+  }
 }
 
+// ── Programar reconexión (3 segundos) ──
+function _scheduleReconnect(){
+  clearTimeout(_camReconnTimer);
+  _camReconnTimer = setTimeout(function(){
+    var camPanel = document.getElementById('nexus-camera');
+    if(camPanel && camPanel.style.display === 'block'){
+      _setupWebRTC();
+    }
+  }, 3000);
+}
+
+// ── Solicitar stats via WebSocket activo ──
+function _requestWsStats(){
+  if(_camWs && _camWs.readyState === WebSocket.OPEN){
+    _camWs.send(JSON.stringify({ type: 'stats' }));
+  }
+}
+
+// ── Núcleo de señalización WebRTC ──
+function _setupWebRTC(){
+  _teardownWebRTC();
+  _setCamStatus('unknown');
+
+  var ws;
+  try {
+    ws = new WebSocket(_wsBase + '/ws/signal');
+  } catch(e){
+    _setCamStatus('offline');
+    _scheduleReconnect();
+    return;
+  }
+  _camWs = ws;
+
+  ws.onopen = function(){
+    var config = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    };
+    var pc = new RTCPeerConnection(config);
+    _camPc = pc;
+
+    pc.ontrack = function(evt){
+      var feed = document.getElementById('cam-feed');
+      if(feed && evt.streams && evt.streams[0]){
+        feed.srcObject = evt.streams[0];
+        _applyCssFilter();
+      }
+    };
+
+    pc.onicecandidate = function(evt){
+      if(evt.candidate && ws.readyState === WebSocket.OPEN){
+        ws.send(JSON.stringify({
+          type:      'ice',
+          candidate: {
+            candidate:     evt.candidate.candidate,
+            sdpMid:        evt.candidate.sdpMid,
+            sdpMLineIndex: evt.candidate.sdpMLineIndex
+          }
+        }));
+      }
+    };
+
+    pc.onconnectionstatechange = function(){
+      var state = pc.connectionState;
+      if(state === 'connected'){
+        _setCamStatus('online');
+      } else if(state === 'failed' || state === 'disconnected'){
+        _setCamStatus('offline');
+        _scheduleReconnect();
+      }
+    };
+
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.createOffer().then(function(offer){
+      return pc.setLocalDescription(offer).then(function(){
+        ws.send(JSON.stringify({ type: 'offer', sdp: offer.sdp }));
+      });
+    }).catch(function(){
+      _setCamStatus('offline');
+      _scheduleReconnect();
+    });
+  };
+
+  ws.onmessage = function(evt){
+    var msg;
+    try { msg = JSON.parse(evt.data); } catch(e){ return; }
+
+    if(msg.type === 'answer' && _camPc){
+      _camPc.setRemoteDescription(
+        new RTCSessionDescription({ type: 'answer', sdp: msg.sdp })
+      ).catch(function(){ _setCamStatus('offline'); });
+    } else if(msg.type === 'stats'){
+      var fpsEl   = document.getElementById('cam-fps-val');
+      var peersEl = document.getElementById('cam-peers-val');
+      if(fpsEl)   fpsEl.textContent   = (msg.fps   !== undefined) ? msg.fps.toFixed(1) + ' fps' : '--';
+      if(peersEl) peersEl.textContent = (msg.peers !== undefined) ? msg.peers : '--';
+    }
+  };
+
+  ws.onerror = function(){
+    _setCamStatus('offline');
+  };
+
+  ws.onclose = function(){
+    var camPanel = document.getElementById('nexus-camera');
+    if(camPanel && camPanel.style.display === 'block'){
+      _setCamStatus('offline');
+      _scheduleReconnect();
+    }
+  };
+}
+
+// ── Captura de frame via Canvas ──
+function captureCamFrame(btn){
+  var feed = document.getElementById('cam-feed');
+  if(!feed || !feed.srcObject){ return; }
+  if(btn) btn.disabled = true;
+  try {
+    var canvas = document.createElement('canvas');
+    canvas.width  = feed.videoWidth  || 1280;
+    canvas.height = feed.videoHeight || 720;
+    var ctx = canvas.getContext('2d');
+    var b = parseFloat(document.getElementById('cam-brightness').value) || 1.0;
+    var c = parseFloat(document.getElementById('cam-contrast').value)   || 1.0;
+    var s = parseFloat(document.getElementById('cam-saturation').value) || 1.0;
+    ctx.filter = 'brightness(' + b + ') contrast(' + c + ') saturate(' + s + ')';
+    ctx.drawImage(feed, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(function(blob){
+      if(blob){
+        var url = URL.createObjectURL(blob);
+        var a   = document.createElement('a');
+        var ts  = new Date().toISOString().slice(0,19).replace(/[T:]/g, '-');
+        a.href     = url;
+        a.download = 'chibio_' + ts + '.jpg';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      if(btn) btn.disabled = false;
+    }, 'image/jpeg', 0.92);
+  } catch(e){
+    if(btn) btn.disabled = false;
+  }
+}
+
+// ── Reset: vuelve sliders a valores neutros y aplica CSS filter ──
 function resetCameraSettings(){
-  _applyCamSettings({ brightness:1.0, contrast:1.0, saturation:1.0, jpeg_quality:80 });
-  _postCamSettings();
+  _applyCamSettings({ brightness: 1.0, contrast: 1.0, saturation: 1.0 });
 }
 
 var MAIN_TOUR_STEPS = [

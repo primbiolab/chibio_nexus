@@ -20,8 +20,10 @@ config.py
 *.env
 
 # ── Archivos de runtime Chi.Bio ───────────────────────────────
-# protocolo.py se genera en ejecución; nunca commitear
+# protocolo.py y derivados se generan en ejecución; nunca commitear
 protocolo.py
+protocolo_mock.py
+protocolo.py.tmp
 
 # ── Archivos ajenos al proyecto ───────────────────────────────
 sd.py
@@ -31,6 +33,14 @@ chat.csv
 CLAUDE.md
 CAMERA_SERVER_EXPANSION_PLAN.md
 reglas.md
+
+# ── Documentos generados (manuales) ──────────────────────────
+*.docx
+*.pdf
+~$*
+
+# ── Configuración de Cloudflare (vive en la instalación local) ─
+config.yml
 
 # ── Logs y datos temporales ───────────────────────────────────
 *.log

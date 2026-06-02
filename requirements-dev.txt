@@ -1,4 +1,0 @@
-# Chi.Bio Nexus — Simulador / desarrollo local (sin hardware)
-# Instalar con: pip install -r requirements-dev.txt
-
-flask
