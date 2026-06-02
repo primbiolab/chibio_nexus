@@ -5,9 +5,7 @@
 (function(){
   var ua = navigator.userAgent || '';
   var mobileUA = /Mobile|Android|iPhone|webOS|BlackBerry/i.test(ua);
-  var touchScreen = navigator.maxTouchPoints > 0;
-  var smallScreen = screen.width < 1024;
-  if(mobileUA || (touchScreen && smallScreen)){
+  if(mobileUA || screen.width < 1024){
     window.location.href = '/mobile-blocked';
   }
 })();
@@ -35,6 +33,16 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/nexus.css') }}">
 </head>
 <body>
+
+<!-- Bloqueo por ventana demasiado estrecha (desktop con viewport < 1024px) -->
+<div id="viewport-block">
+  <div class="vb-box">
+    <div class="vb-icon">🔬</div>
+    <h1>Chi.Bio Nexus</h1>
+    <p>Esta plataforma requiere una ventana de al menos <strong>1024 px</strong> de ancho.<br><br>
+    Amplía la ventana del navegador o accede desde un equipo de escritorio.</p>
+  </div>
+</div>
 
 <!-- TOPBAR NEXUS -->
 <div id="topbar">
@@ -65,7 +73,7 @@
     </div>
     <button class="btn btn-scan" id="main-scan-btn" onclick="doScanDevices()"><i class="fa-solid fa-satellite-dish"></i> Escanear</button>
     <div class="tb-sep"></div>
-    <div class="spill mobile-hidden" id="exp-pill"><div class="sdot"></div><span id="exp-pill-text">Detenido</span></div>
+    <div class="spill" id="exp-pill"><div class="sdot"></div><span id="exp-pill-text">Detenido</span></div>
     <span class="tb-text" id="StartTime">—</span>
     <span class="tb-text" id="cyc">Ciclo —</span>
     <div class="cpill" id="cloud-pill">
@@ -123,10 +131,6 @@
 
 
 
-  <!-- Spill móvil -->
-  <div class="spill desktop-hidden" id="exp-pill-mob"><div class="sdot"></div><span id="exp-pill-text-mob">Detenido</span></div>
-  <button class="mob-menu-btn" id="mob-menu-btn" onclick="toggleMobMenu()"><i class="fa-solid fa-bars"></i></button>
-
 <!-- Botones globales siempre visibles -->
   <div id="global-buttons" style="display:flex; align-items:center; gap:9px;">
     <div class="tb-sep"></div>
@@ -142,7 +146,7 @@
 
 <!-- ══════════════ COLUMNA IZQUIERDA ══════════════════════ -->
 <div class="col-l">
-  <div class="tab-container mob-active" id="tab-setup">
+  <div class="tab-container" id="tab-setup">
 
   <!-- DENSIDAD ÓPTICA -->
   <div class="card c-gr">
@@ -553,15 +557,6 @@
     </div>
   </div>
 
-  <!-- Fluorescencia Móvil (Placeholder) -->
-  <div class="card c-am" id="fp-mob-card" style="display:none;">
-    <div class="ch">
-      <div class="ch-ico" style="background:var(--am-d);color:var(--am)"><i class="fa-solid fa-star"></i></div>
-      <span class="ch-ttl">Fluorescencia</span>
-      <button class="ib ib-gr ib-sm" id="MeasureFPMob" onclick="measureFP()" style="margin-left:auto"><i class="fa-solid fa-wand-magic-sparkles"></i> Medir</button>
-    </div>
-    <div class="cb" style="padding:8px;" id="fp-mob-body"></div>
-  </div>
 
   <!-- Espectrómetro AS7341 -->
   <div class="card c-pu">
@@ -603,10 +598,6 @@
 
 <!-- NEXUS: Panel Cámara -->
 <div id="nexus-camera" data-cam-base="https://camera.primbiolab.org">
-  <div id="cam-rotate-hint">
-    <div class="rotate-icon-wrap"><i class="fa-solid fa-mobile-screen-button"></i></div>
-    <p>Gira tu teléfono a <strong>horizontal</strong><br>para ver la cámara</p>
-  </div>
   <div id="cam-inner">
     <div id="cam-video-area">
       <video id="cam-feed" autoplay playsinline muted></video>
@@ -656,13 +647,6 @@
       </button>
     </div>
   </div>
-</div>
-
-<!-- TABS MÓVILES INFERIORES — fuera de nexus-main para que nunca se oculten -->
-<div id="mob-tabs">
-  <button class="mob-tab active" onclick="switchMobTab('charts', this)"><i class="fa-solid fa-chart-line"></i><span>Gráficas</span></button>
-  <button class="mob-tab" onclick="switchMobCamera(this)"><i class="fa-solid fa-video"></i><span>Cámara</span></button>
-  <button class="mob-tab" onclick="switchMobTab('advanced', this)"><i class="fa-solid fa-microchip"></i><span>Avanzado</span></button>
 </div>
 
 <div hidden id="GraphReplot" value="0"></div>

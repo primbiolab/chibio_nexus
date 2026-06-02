@@ -148,104 +148,6 @@ window.addEventListener('message', function(e){
   }
 });
 
-// ── Control de Menú Móvil Superior ──
-function toggleMobMenu() {
-  var btn = document.getElementById('mob-menu-btn');
-  var menu = document.getElementById('tb-content');
-  if(btn) btn.classList.toggle('active');
-  if(menu) menu.classList.toggle('open');
-}
-
-// ── Control de Tabs en Móvil Inferior ──
-function switchMobTab(tabId, btn) {
-  // Restaurar nexus-main si veníamos de la cámara
-  document.getElementById('nexus-main').style.display = 'block';
-  document.getElementById('nexus-camera').style.display = 'none';
-
-  // Quitar active de todos los botones de tab móvil
-  var tabs = document.querySelectorAll('.mob-tab');
-  tabs.forEach(function(t){ t.classList.remove('active'); });
-  if(btn) btn.classList.add('active');
-
-  // Ocultar todos los contenedores de tab
-  var containers = document.querySelectorAll('.tab-container');
-  containers.forEach(function(c){ c.classList.remove('mob-active'); });
-
-  // Mostrar el seleccionado
-  var activeContainer = document.getElementById('tab-' + tabId);
-  if(activeContainer) activeContainer.classList.add('mob-active');
-
-  // Redibujar gráficas si se entra a la vista de charts
-  if(tabId === 'charts') {
-    if(typeof _updateChartGrid === 'function') _updateChartGrid();
-    if(_lastData) _drawAllCharts(_lastData);
-  }
-}
-
-function switchMobCamera(btn) {
-  var tabs = document.querySelectorAll('.mob-tab');
-  tabs.forEach(function(t){ t.classList.remove('active'); });
-  if(btn) btn.classList.add('active');
-  var containers = document.querySelectorAll('.tab-container');
-  containers.forEach(function(c){ c.classList.remove('mob-active'); });
-  document.getElementById('nexus-main').style.display = 'none';
-  document.getElementById('nexus-camera').style.display = 'block';
-  _checkCamOrientation();
-  loadCameraSettings();
-}
-
-// Inicialización de tabs al abrir en móvil
-var _wasMobile = window.innerWidth <= 768;
-if(_wasMobile) {
-  var firstBtn = document.querySelector('.mob-tab');
-  switchMobTab('charts', firstBtn);
-}
-window.addEventListener('resize', function(){
-  var isMobile = window.innerWidth <= 768;
-  if(isMobile) {
-    var anyActive = Array.from(document.querySelectorAll('.tab-container')).some(function(el){
-      return el.classList.contains('mob-active');
-    });
-    if(!anyActive) {
-      var firstBtn = document.querySelector('.mob-tab');
-      switchMobTab('charts', firstBtn);
-    }
-  } else if(_wasMobile) {
-    // Solo restaurar desktop al cruzar el umbral móvil→desktop
-    switchNexusTab(_nexusTab || 'main');
-  }
-  _wasMobile = isMobile;
-  syncMobileFluorescence();
-  _checkCamOrientation();
-});
-
-// ── Sincronizar Fluorescencia en Móvil vs Desktop ──
-function syncMobileFluorescence() {
-  var isMobile = window.innerWidth <= 768;
-  var fpMoveable = document.getElementById('fp-moveable');
-  var deskDest = document.getElementById('cpane-fp');
-  var mobDest = document.getElementById('fp-mob-body');
-  
-  if(isMobile) {
-    if(!fpMoveable || !mobDest || !deskDest) return;
-  if(fpMoveable.parentNode !== mobDest) {
-      mobDest.appendChild(fpMoveable);
-      document.getElementById('fp-mob-card').style.display = 'block';
-      document.getElementById('fp-desktop-header').style.display = 'none';
-      document.getElementById('adv-ctabs-header').style.display = 'none';
-      switchPane('term'); // En Desktop la pestaña viva en avanzado será Terminal
-    }
-  } else {
-    if(fpMoveable.parentNode !== deskDest) {
-      deskDest.appendChild(fpMoveable);
-      document.getElementById('fp-mob-card').style.display = 'none';
-      document.getElementById('fp-desktop-header').style.display = 'flex';
-      document.getElementById('adv-ctabs-header').style.display = 'flex';
-    }
-  }
-}
-syncMobileFluorescence(); // Ejecutar on load
-
 // ── Control de Tema y Fullscreen ──
 function toggleTheme() {
   var b = document.documentElement;
@@ -639,7 +541,7 @@ function createRipple(e) {
 
 // Auto-inject ripple on all primary buttons
 document.addEventListener('DOMContentLoaded', function() {
-  var selectors = '.btn, .ib, .mb, .dev-btn, .btn-csv, .mob-tab';
+  var selectors = '.btn, .ib, .mb, .dev-btn, .btn-csv';
   document.querySelectorAll(selectors).forEach(function(el) {
     el.addEventListener('click', createRipple);
   });
@@ -913,9 +815,6 @@ function _updateDataInner(data){
   /* Topbar */
   var pill=document.getElementById('exp-pill');pill.classList.toggle('on',running);
   document.getElementById('exp-pill-text').textContent=running?'Ejecutando':'Detenido';
-  /* BUG FIX: pill móvil del topbar también debe actualizarse */
-  var pillMob=document.getElementById('exp-pill-mob');if(pillMob)pillMob.classList.toggle('on',running);
-  var pillMobTxt=document.getElementById('exp-pill-text-mob');if(pillMobTxt)pillMobTxt.textContent=running?'Ejecutando':'Detenido';
   document.getElementById('StartTime').textContent=running?data.Experiment.startTime:'—';
   document.getElementById('cyc').textContent='Ciclo '+(data.Experiment.cycles||'—');
   document.getElementById('TName').textContent=data.UIDevice||'—';
@@ -928,6 +827,21 @@ function _updateDataInner(data){
     var ok=data.presentDevices&&data.presentDevices[m]===1;
     b.disabled=!ok; b.classList.toggle('active',data.UIDevice===m);
   });
+
+  /* Sync connected reactors to Architect selectors */
+  var _connectedDevs = ['M0','M1','M2','M3','M4','M5','M6','M7'].filter(function(m,i){
+    return data.presentDevices && data.presentDevices[m] === 1;
+  });
+  var _archSel = document.getElementById('arch-reactor');
+  if(_archSel){
+    var _archPrev = _archSel.value;
+    _archSel.innerHTML = _connectedDevs.length
+      ? _connectedDevs.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('')
+      : '<option value="">—</option>';
+    _archSel.value = (_connectedDevs.indexOf(_archPrev) !== -1) ? _archPrev : (data.UIDevice || _connectedDevs[0] || '');
+  }
+  archCmd('setConnectedDevices', { devices: _connectedDevs, active: data.UIDevice });
+
   document.getElementById('ExperimentStart').disabled=running;
   document.getElementById('ExperimentReset').disabled=running;
   document.getElementById('ExperimentStop').disabled=!running;
@@ -1150,21 +1064,6 @@ function loadCameraSettings(){
   _setupWebRTC();
   _updateCamReactorInfo();
 }
-
-function _checkCamOrientation(){
-  var camPanel = document.getElementById('nexus-camera');
-  var hint = document.getElementById('cam-rotate-hint');
-  if(!hint || !camPanel) return;
-  var camVisible = camPanel.style.display === 'block';
-  if(!camVisible){ hint.classList.remove('active'); return; }
-  var isMobile = window.innerWidth <= 768;
-  var isPortrait = window.innerHeight > window.innerWidth;
-  hint.classList.toggle('active', isMobile && isPortrait);
-}
-
-window.addEventListener('orientationchange', function(){
-  setTimeout(_checkCamOrientation, 150);
-});
 
 // ── _applyCamSettings: setea sliders y aplica CSS filter (usado en reset) ──
 function _applyCamSettings(data){

@@ -1562,6 +1562,18 @@ window.addEventListener('message', function(e){
         document.getElementById('dev-sel').value = e.data.val;
         document.getElementById('dev-badge').textContent = e.data.val;
         break;
+      case 'setConnectedDevices': {
+        var _devs = (e.data.val && e.data.val.devices) || [];
+        var _active = (e.data.val && e.data.val.active) || '';
+        var _sel = document.getElementById('dev-sel');
+        var _prev = _sel.value;
+        _sel.innerHTML = _devs.length
+          ? _devs.map(function(m){ return '<option value="'+m+'">'+m+'</option>'; }).join('')
+          : '<option value="">—</option>';
+        var _target = _devs.indexOf(_prev) !== -1 ? _prev : (_devs.indexOf(_active) !== -1 ? _active : _devs[0]);
+        if(_target) { _sel.value = _target; document.getElementById('dev-badge').textContent = _target; }
+        break;
+      }
     }
   }
 });

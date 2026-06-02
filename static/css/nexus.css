@@ -86,8 +86,6 @@ input,select{font-family:var(--f-ui);}
 @keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
 .tb-text{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
-.mob-menu-btn{display:none;}
-.desktop-hidden{display:none;}
 
 #cyc{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--tx3);padding:3px 9px;border:1px solid var(--bd);border-radius:var(--rsm);}
 .tb-r{margin-left:auto;display:flex;align-items:center;gap:6px;}
@@ -455,7 +453,7 @@ select.field{cursor:pointer;}
 .spec-tile .sub{font-size:9px;color:var(--tx3);margin-top:1px;font-weight:700;}
 
 /* ── RIPPLE EFFECT ───────────────────────────────────────── */
-.btn, .ib, .mb, .dev-btn, .mob-tab {
+.btn, .ib, .mb, .dev-btn {
   position: relative;
   overflow: hidden;
 }
@@ -664,125 +662,22 @@ select.field{cursor:pointer;}
 .cam-exp-badge.running{background:rgba(0,214,143,.15);color:var(--gr);}
 .cam-exp-badge.stopped{background:rgba(239,68,68,.1);color:#ef4444;}
 
-/* ── Camera rotation hint (mobile portrait) ─────────────── */
-#cam-rotate-hint{
-  position:absolute;inset:0;background:var(--bg);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  gap:28px;z-index:20;
+/* ── BLOQUEO DE VIEWPORT ESTRECHO ───────────────────────── */
+#viewport-block{
+  display:none;
+  position:fixed;inset:0;z-index:99999;
+  background:#0b0e14;
+  align-items:center;justify-content:center;
+  font-family:var(--f-ui,sans-serif);
 }
-#cam-rotate-hint.active{display:flex;}
-.rotate-icon-wrap{
-  width:90px;height:90px;display:flex;align-items:center;justify-content:center;
-  border:2px solid rgba(0,214,143,.3);border-radius:50%;
-  background:var(--gr-d);
+@media(max-width:1023px){
+  #viewport-block{display:flex;}
 }
-.rotate-icon-wrap i{
-  font-size:54px;color:var(--gr);
-  animation:camPhoneRotate 2.4s ease-in-out infinite;
-  transform-origin:center;
-}
-@keyframes camPhoneRotate{
-  0%  {transform:rotate(0deg);}
-  35% {transform:rotate(-90deg);}
-  65% {transform:rotate(-90deg);}
-  100%{transform:rotate(0deg);}
-}
-#cam-rotate-hint p{
-  font-size:14px;color:var(--tx2);text-align:center;
-  line-height:1.7;font-family:var(--f-ui);font-weight:600;max-width:220px;
-}
-#cam-rotate-hint strong{color:var(--gr);}
-
-/* ── Mobile landscape camera adjustments ────────────────── */
-@media(max-width:900px) and (orientation:landscape) and (max-height:500px){
-  #cam-sidebar{width:190px;padding:8px 10px;gap:8px;font-size:12px;}
-  .cam-sidebar-hdr{font-size:9.5px;padding-bottom:6px;}
-  .cam-ctrl-label{font-size:10px;}
-  .cam-ctrl input[type=range]{height:3px;}
-  .cam-info-row{font-size:10px;}
-  .cam-sidebar-hdr+.cam-ctrl{margin-top:0;}
-}
-
-/* ── MOBILE TWEAKS ──────────────────────────────────────────── */
-#mob-tabs{display:none;}
-
-@media(max-width:768px){
-  :root{ --mob-tab-h:54px; }
-
-  /* Rediseño TOPBAR Móvil (Menú desplegable) */
-  #topbar{padding:0 10px;justify-content:flex-start;}
-  .logo{flex:1;}
-  .desktop-hidden{display:flex;}
-  .mobile-hidden{display:none !important;}
-  .mob-menu-btn{
-    display:flex;align-items:center;justify-content:center;
-    background:transparent;border:1px solid var(--bd2);color:var(--tx2);
-    border-radius:var(--rsm);width:32px;height:32px;font-size:14px;cursor:pointer;
-    transition:all .2s;
-  }
-  .mob-menu-btn.active{background:var(--s3);color:var(--tx);border-color:var(--tx3);}
-  
-  .tb-content{
-    display:none;position:absolute;top:54px;right:8px;width:220px;
-    background:var(--s2);border:1px solid var(--bd);border-radius:var(--r);
-    padding:12px;flex-direction:column;gap:12px;
-    box-shadow:0 8px 30px rgba(0,0,0,0.7);z-index:1000;
-  }
-  .tb-content.open{display:flex;}
-  .tb-sep{display:none;}
-  .tb-content .dev-row{flex-wrap:wrap;justify-content:center;}
-  .tb-content .tb-r{flex-direction:column;margin:0;width:100%;align-items:stretch;gap:8px;}
-  .tb-content .tb-r .btn{justify-content:center;width:100%;}
-  #StartTime,#cyc{text-align:center;}
-  .cpill{justify-content:center;}
-
-  /* Estructura Page / Tabs en Móvil */
-  #page{display:block;grid-template-columns:none;bottom:var(--mob-tab-h);}
-  .col-l,.col-c,.col-r{padding:0;border:none;height:0;overflow:visible;display:block;}
-  
-  .tab-container{
-    position:absolute;top:0;left:0;right:0;bottom:0;padding:9px;
-    overflow-y:auto;overflow-x:hidden;display:none;
-  }
-  .tab-container.mob-active{display:flex !important;}
-
-  /* Específico: En movil las graficas no pueden ser grid 2x2 */
-  .charts4{display:flex !important;flex-direction:column;height:auto;gap:10px;min-height:0;}
-  .cbox{height:250px;flex-shrink:0;}
-
-  /* Fluorescencia en móvil debe ser en columna (vertical) */
-  .fp-grid{display:flex !important; flex-direction:column !important; gap:8px;}
-
-  /* Restablecer LED Grid a compacto en móvil */
-  .led-grid{gap:5px; flex:none; justify-content:flex-start;}
-
-  /* Acomodar los CTABS de terminal/fluorescencia para no desbordar */
-  .ctabs{flex-wrap:wrap;}
-
-  /* Modo visualización — ocultar controles de topbar */
-  #nexus-tab-bar,
-  #ctx-main,
-  #ctx-architect,
-  #global-buttons,
-  #mob-menu-btn { display: none !important; }
-
-  /* Panel cámara no se solapa con la barra inferior */
-  #nexus-camera { bottom: var(--mob-tab-h) !important; }
-
-  /* Tab bar fijo inferior — z-index alto para superar el iframe de cámara */
-  #mob-tabs{
-    display:flex;position:fixed;bottom:0;left:0;right:0;
-    height:var(--mob-tab-h);background:var(--s1);border-top:1px solid var(--bd);z-index:9000;
-  }
-  .mob-tab{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:4px;background:transparent;border:none;color:var(--tx3);font-family:var(--f-ui);
-    font-size:9.5px;font-weight:700;cursor:pointer;transition:all .15s;padding:0;
-  }
-  .mob-tab i{font-size:16px;}
-  .mob-tab.active{color:var(--gr);}
-  .mob-tab.active i{text-shadow:0 0 10px rgba(0,214,143,.5);}
-}
+.vb-box{text-align:center;color:#e2e8f0;padding:40px;max-width:360px;}
+.vb-icon{font-size:40px;margin-bottom:16px;}
+.vb-box h1{color:#00d68f;font-size:22px;margin-bottom:12px;font-family:inherit;}
+.vb-box p{color:#94a3b8;font-size:14px;line-height:1.6;margin:0;}
+.vb-box strong{color:#e2e8f0;}
 
 /* ── ESTILOS HEREDADOS DEL ARCHITECT ── */
 .btn-arch-accent { background: #00e5a0 !important; color: #000 !important; border: none !important; font-weight: 700 !important; box-shadow: 0 0 10px rgba(0,229,160,0.2); }
