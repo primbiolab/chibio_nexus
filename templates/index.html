@@ -512,6 +512,13 @@
           <span class="led-val" id="LEDICurrent">0.00</span>
           <label class="tog" style="--led-rgb:100,180,80"><input type="checkbox" id="LEDI-tog" onchange="switchLED('LEDI',this.checked)"><span class="tog-t"></span></label>
         </div>
+        <div class="led-row" id="led-row-LEDV" style="--led-rgb:240,240,220;display:none">
+          <div class="led-name-box"><div class="led-dot" style="background:#f0f0dc;border:1px solid var(--bd)"></div><span class="led-name">Blanco</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDV',-0.1)">−</button><input type="number" class="led-inp" id="LEDVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDV',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDVSet" onclick="setLED('LEDV')">Set</button>
+          <span class="led-val" id="LEDVCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:240,240,220"><input type="checkbox" id="LEDV-tog" onchange="switchLED('LEDV',this.checked)"><span class="tog-t"></span></label>
+        </div>
         <div class="led-row" id="led-row-LASER650" style="--led-rgb:220,38,38">
           <div class="led-name-box"><div class="led-dot" style="background:#dc2626"></div><span class="led-name">Láser 650</span></div>
           <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LASER650',-0.1)">−</button><input type="number" class="led-inp" id="LASER650Input" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LASER650',0.1)">+</button></div>
@@ -519,31 +526,6 @@
           <span class="led-val" id="LASER650Current">0.00</span>
           <label class="tog" style="--led-rgb:220,38,38"><input type="checkbox" id="LASER650-tog" onchange="switchLED('LASER650',this.checked)"><span class="tog-t"></span></label>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Luz Blanca (LEDV) — mezcla virtual LEDB 457nm + LEDI 550nm -->
-  <div class="card c-am" id="led-blanco-card" style="display:none">
-    <div class="ch"><div class="ch-ico" style="background:var(--am-d);color:var(--am)"><i class="fa-solid fa-sun"></i></div><span class="ch-ttl">Luz Blanca</span></div>
-    <div class="cb" style="padding:7px;flex:1;min-height:0;">
-      <div class="led-grid">
-        <div class="led-row" id="led-row-LEDV" style="--led-rgb:240,240,220">
-          <div class="led-name-box"><div class="led-dot" style="background:#f0f0dc;border:1px solid var(--bd)"></div><span class="led-name">Blanco</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDV',-0.1)">−</button><input type="number" class="led-inp" id="LEDVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDV',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDVSet" onclick="setLED('LEDV')">Set</button>
-          <span class="led-val" id="LEDVCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:240,240,220"><input type="checkbox" id="LEDV-tog" onchange="switchLED('LEDV',this.checked)"><span class="tog-t"></span></label>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Luz UV -->
-  <div class="card c-pu" id="led-uv-card">
-    <div class="ch"><div class="ch-ico" style="background:var(--pu-d);color:var(--pu)"><i class="fa-solid fa-radiation"></i></div><span class="ch-ttl">Luz UV 280</span></div>
-    <div class="cb" style="padding:7px;flex:1;min-height:0;">
-      <div class="led-grid">
         <div class="led-row" id="led-row-UV" style="--led-rgb:109,40,217">
           <div class="led-name-box"><div class="led-dot" style="background:#6d28d9"></div><span class="led-name">UV 280</span></div>
           <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('UV',-0.1)">−</button><input type="number" class="led-inp" id="UVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('UV',0.1)">+</button></div>

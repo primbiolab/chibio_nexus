@@ -912,14 +912,13 @@ function _updateDataInner(data){
   var versionKey = (data.UIDevice||'') + '_v' + ledVer;
   if (!window._ledVersionApplied || window._ledVersionApplied !== versionKey) {
     window._ledVersionApplied = versionKey;
-    var blancoCard=document.getElementById('led-blanco-card');
     if (ledVer === 1) {
       /* V1: 6500K (LEDG) presente; no hay LEDH/LEDI/LEDV */
       var r;
       r=document.getElementById('led-row-LEDG');if(r)r.style.display='';
       r=document.getElementById('led-row-LEDH');if(r)r.style.display='none';
       r=document.getElementById('led-row-LEDI');if(r)r.style.display='none';
-      if(blancoCard)blancoCard.style.display='none';
+      r=document.getElementById('led-row-LEDV');if(r)r.style.display='none';
       var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
                      {v:'LEDF',t:'623nm'},{v:'LEDG',t:'6500K'},{v:'LASER650',t:'Láser'}];
     } else {
@@ -928,7 +927,7 @@ function _updateDataInner(data){
       r=document.getElementById('led-row-LEDG');if(r)r.style.display='none';
       r=document.getElementById('led-row-LEDH');if(r)r.style.display='';
       r=document.getElementById('led-row-LEDI');if(r)r.style.display='';
-      if(blancoCard)blancoCard.style.display='';
+      r=document.getElementById('led-row-LEDV');if(r)r.style.display='';
       var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
                      {v:'LEDF',t:'623nm'},{v:'LEDH',t:'600nm'},{v:'LEDI',t:'550nm'},
                      {v:'LEDV',t:'Blanco'},{v:'LASER650',t:'Láser'}];

@@ -23,6 +23,7 @@ const META = {
   ramp_temp:   {label:'Rampa Térmica',        ico:'fa-arrow-trend-up',   col:'#f43f5e'},
   led:         {label:'Control LED',          ico:'fa-lightbulb',        col:'#fbbf24'},
   uv:          {label:'Control UV',           ico:'fa-radiation',        col:'#8b5cf6'},
+  laser:       {label:'Luz Láser 650nm',      ico:'fa-crosshairs',       col:'#dc2626'},
   pump:        {label:'Dispensar Bomba',      ico:'fa-droplet',          col:'#3b82f6'},
   turbidostat: {label:'Turbidostato',         ico:'fa-chart-line',       col:'#22d3ee'},
   chemostat:   {label:'Quimiostato',          ico:'fa-circle-nodes',     col:'#ec4899'},
@@ -34,7 +35,7 @@ const META = {
   log:         {label:'Mensaje en Consola',   ico:'fa-terminal',         col:'#10b981'},
 };
 
-const LED_WL = {LEDB:'457nm',LEDC:'500nm',LEDD:'523nm',LEDF:'623nm',LEDH:'600nm',LEDI:'550nm',LEDV:'Blanco',LASER650:'Láser 650nm'};
+const LED_WL = {LEDB:'457nm',LEDC:'500nm',LEDD:'523nm',LEDF:'623nm',LEDH:'600nm',LEDI:'550nm',LEDV:'Blanco'};
 
 // ── Modals & Settings ─────────────────────────────────────
 function openPumpModal() {
@@ -123,6 +124,7 @@ function mkNode(type){
     case 'ramp_temp':   return {...b, temp_start:37.0, temp_end:42.0, duration:60};
     case 'led':         return {...b, led:'LEDB', power:0.1, mode:'on', duration:1, unit:'min'};
     case 'uv':          return {...b, power:0.5, mode:'on', duration:1, unit:'min'};
+    case 'laser':       return {...b, power:0.5, mode:'on', duration:1, unit:'min'};
     case 'pump':        return {...b, pump:'Pump1', duration:5.0};
     case 'turbidostat': return {...b, state:'on'};
     case 'chemostat':   return {...b, state:'on', p1:0.02, p2:0.1};
@@ -484,8 +486,9 @@ function buildForm(node, body, parentArr){
     case 'init_od': row('OD objetivo', numInput('od', node.od, 0, 10, 0.01)); break;
     case 'init_stir': row('Velocidad (0-1)', numInput('speed', node.speed, 0, 1, 0.1)); note('<i class="fa-solid fa-info-circle"></i> Agitación magnética. 0.5 es estándar.','info'); break;
 
-    case 'led': 
-    case 'uv': {
+    case 'led':
+    case 'uv':
+    case 'laser': {
       if(node.type === 'led') row('LED', selEl('led', Object.entries(LED_WL).map(([k,v])=>[k,k+' — '+v]), node.led));
       
       const rUnit = row('Unidad de tiempo', selEl('unit', [['min','Minutos (FSM)'],['sec','Segundos (Pulso)']], node.unit));
@@ -605,7 +608,7 @@ function updateCount(){
 // Returns true for blocks that cause processNodes to advance curr (new FSM state)
 function _isStateAdv(n) {
   if (n.type === 'wait' && (n.unit === 'min' || n.unit === 'gen')) return true;
-  if ((n.type === 'led' || n.type === 'uv') && n.mode === 'pulse' && n.unit === 'min') return true;
+  if ((n.type === 'led' || n.type === 'uv' || n.type === 'laser') && n.mode === 'pulse' && n.unit === 'min') return true;
   return ['ramp_temp','trigger','loop'].includes(n.type);
 }
 
@@ -656,7 +659,8 @@ function validate(nodes,errs,warns,M){
         break;
       case 'led':
       case 'uv':
-        let devName = n.type === 'led' ? `LED ${n.led}` : 'UV';
+      case 'laser':
+        let devName = n.type === 'led' ? `LED ${n.led}` : (n.type === 'uv' ? 'UV' : 'Láser 650nm');
         if (n.power > 0.5) {
             if (n.mode === 'on') {
                 errs.push(`[${devName}] Peligro Crítico: Encendido constante a potencia > 0.5. Quitará el experimento o quemará la placa. Modifica la potencia o ponle un tiempo.`);
@@ -728,7 +732,7 @@ function validate(nodes,errs,warns,M){
 
   // ── Warning: measure_od antes del primer bloque de hardware ──
   if (nodes === AST) {
-    const HW_TYPES = ['thermostat','ramp_temp','led','uv','pump','turbidostat','chemostat','zigzag'];
+    const HW_TYPES = ['thermostat','ramp_temp','led','uv','laser','pump','turbidostat','chemostat','zigzag'];
     let firstHwIdx = -1, firstMeasureBeforeHwIdx = -1;
     for (let i = 0; i < nodes.length; i++) {
       const t = nodes[i].type;
@@ -777,9 +781,9 @@ function compileFSM(nodes, M, progName) {
                 write(waitState, `    sysData[M]['Custom']['Status'] = ${next}.0`);
                 curr = next;
             }
-            else if ((n.type === 'led' || n.type === 'uv') && n.mode === 'pulse' && n.unit === 'min') {
+            else if ((n.type === 'led' || n.type === 'uv' || n.type === 'laser') && n.mode === 'pulse' && n.unit === 'min') {
                 let waitState = allocateState();
-                let dev = n.type === 'led' ? n.led : 'UV';
+                let dev = n.type === 'led' ? n.led : (n.type === 'uv' ? 'UV' : 'LASER650');
                 write(curr, `addTerminal(M, '${dev} encendido — apagado en ${n.duration} ciclo${n.duration===1?'':'s'} al ${Math.round(n.power*100)}%')`);
                 write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`);
                 write(curr, `SetOutputOn(M, '${dev}', 1)`);
@@ -844,8 +848,8 @@ function compileFSM(nodes, M, progName) {
             }
             else {
                 // Sincrónicos
-                if (n.type === 'led' || n.type === 'uv') {
-                    let dev = n.type === 'led' ? n.led : 'UV';
+                if (n.type === 'led' || n.type === 'uv' || n.type === 'laser') {
+                    let dev = n.type === 'led' ? n.led : (n.type === 'uv' ? 'UV' : 'LASER650');
                     if (n.mode === 'on') {
                         write(curr, `sysData[M]['${dev}']['target'] = ${n.power}`);
                         write(curr, `SetOutputOn(M, '${dev}', 1)`);
@@ -1064,7 +1068,7 @@ function handleAIKeyPress(event) {
 const _TVAR_NORMALIZE = {od:'OD',growthrate:'GrowthRate',temp:'Temp',fp1:'FP1',fp2:'FP2',fp3:'FP3',generations:'Generations'};
 const _OP_NORMALIZE   = {gt:'>',lt:'<',gte:'>=',lte:'<=',ge:'>=',le:'<=',eq:'=='};
 const _LED_NORMALIZE  = {blue:'LEDB',azul:'LEDB',green:'LEDD',verde:'LEDD',red:'LEDF',rojo:'LEDF',white:'LEDV',blanco:'LEDV'};
-const _LED_VALID      = ['LEDB','LEDC','LEDD','LEDF','LEDH','LEDI','LEDV','LASER650'];
+const _LED_VALID      = ['LEDB','LEDC','LEDD','LEDF','LEDH','LEDI','LEDV'];
 const _PUMP_VALID     = ['Pump1','Pump2','Pump3','Pump4'];
 const _UNIT_VALID     = ['sec','min','gen'];
 
