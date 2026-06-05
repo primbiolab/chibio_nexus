@@ -34,7 +34,7 @@ const META = {
   log:         {label:'Mensaje en Consola',   ico:'fa-terminal',         col:'#10b981'},
 };
 
-const LED_WL = {LEDB:'457nm',LEDC:'500nm',LEDD:'523nm',LEDF:'623nm',LEDG:'6500K',LASER650:'Láser 650nm'};
+const LED_WL = {LEDB:'457nm',LEDC:'500nm',LEDD:'523nm',LEDF:'623nm',LEDH:'600nm',LEDI:'550nm',LEDV:'Blanco',LASER650:'Láser 650nm'};
 
 // ── Modals & Settings ─────────────────────────────────────
 function openPumpModal() {
@@ -1063,8 +1063,8 @@ function handleAIKeyPress(event) {
 
 const _TVAR_NORMALIZE = {od:'OD',growthrate:'GrowthRate',temp:'Temp',fp1:'FP1',fp2:'FP2',fp3:'FP3',generations:'Generations'};
 const _OP_NORMALIZE   = {gt:'>',lt:'<',gte:'>=',lte:'<=',ge:'>=',le:'<=',eq:'=='};
-const _LED_NORMALIZE  = {blue:'LEDB',azul:'LEDB',green:'LEDD',verde:'LEDD',red:'LEDF',rojo:'LEDF',white:'LEDG',blanco:'LEDG'};
-const _LED_VALID      = ['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI'];
+const _LED_NORMALIZE  = {blue:'LEDB',azul:'LEDB',green:'LEDD',verde:'LEDD',red:'LEDF',rojo:'LEDF',white:'LEDV',blanco:'LEDV'};
+const _LED_VALID      = ['LEDB','LEDC','LEDD','LEDF','LEDH','LEDI','LEDV','LASER650'];
 const _PUMP_VALID     = ['Pump1','Pump2','Pump3','Pump4'];
 const _UNIT_VALID     = ['sec','min','gen'];
 
