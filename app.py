@@ -515,11 +515,14 @@ def initialise(M):
         if (NewLevel>Baseline*3+20):
             V1_Present = 1
         
-        # La autodetección óptica al 10% da falso V2 con el 6500K (banda ancha) porque no supera
-        # el umbral nm583 que el 600nm (banda angosta) sí supera. El hardware aquí es V1 con 6500K
-        # funcional, así que forzamos V1. Conservamos la medición cruda solo para diagnóstico.
-        print(str(datetime.now()) + " LED detect raw on " + str(M) + ": V1_Present=" + str(V1_Present) + " V2_Present=" + str(V2_Present) + " -> forzado a V1")
-        sysData[M]['Version']['LED']=1
+        print(str(datetime.now()) + " LED detect raw on " + str(M) + ": V1_Present=" + str(V1_Present) + " V2_Present=" + str(V2_Present))
+        if (V1_Present==1 and V2_Present==0):
+            sysData[M]['Version']['LED']=1
+        elif (V1_Present==0 and V2_Present==1):
+            sysData[M]['Version']['LED']=2
+        else:
+            sysData[M]['Version']['LED']=1
+            print(str(datetime.now()) + " ERROR on " + str(M) + ', unknown LED version. Defaulting to version 1.')
 
         
 
@@ -853,10 +856,7 @@ def SetOutput(M,item):
             sysData[M]['OD']['ON']=0
     
     elif (item=='LEDC' or item=='LEDD' or item=='LEDF' or item=='LEDG' or item == 'LEDH'):
-        _frac = sysData[M][item]['target']*float(sysData[M][item]['ON'])
-        if item=='LEDG':
-            print(str(datetime.now()) + ' [LEDG] target=' + str(sysData[M][item]['target']) + ' ON=' + str(sysData[M][item]['ON']) + ' frac=' + str(_frac))
-        setPWM(M,'PWM',sysItems[item],_frac,0)
+        setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
     elif (item=='LEDB' or item == 'LEDI'): #We must handle these differently in case they are simultaneously being used to mix with LEDV
         if (sysData[M]['LEDV']['target']*float(sysData[M]['LEDV']['ON'])>0): #If LEDV is on, we need to make up the difference in these other LEDs.
             # First determine what is the intensity for this LED required to maintain current LEDV level. Note we have alreayd checked that LEDV is on.
@@ -935,13 +935,14 @@ def PumpModulation(M,item):
 
     # ── MODO MANUAL: sin experimento corriendo, la bomba corre continua ──
     if sysData[M]['Experiment']['ON'] == 0:
-        # Con target=0 (defecto) se corre a velocidad máxima, igual que el original.
-        # Con target distinto de cero se usa como fracción PWM (mínimo 0.15 para arranque seguro).
-        pwm_fraction = abs(sysData[M][item]['target'])
-        if 0.0 < pwm_fraction < 0.15:
-            pwm_fraction = 0.15
-        elif pwm_fraction > 1.0:
-            pwm_fraction = 1.0
+        # Compensación de zona muerta: mapeo lineal [0,1] → [PUMP_DZ, 1.0].
+        # target=0 → bomba apagada. target>0 recibe mínimo PUMP_DZ de PWM para vencer inercia.
+        PUMP_DZ = 0.6
+        raw_fraction = max(0.0, min(1.0, abs(sysData[M][item]['target'])))
+        if raw_fraction <= 0.0:
+            pwm_fraction = 0.0
+        else:
+            pwm_fraction = PUMP_DZ + raw_fraction * (1.0 - PUMP_DZ)
 
         sysDevices[M][item]['active']=1
         if sysData[M][item]['target'] >= 0:
@@ -971,21 +972,25 @@ def PumpModulation(M,item):
     # ── MODO EXPERIMENTO: duty cycle atado al ciclo del experimento ──
     Time1=datetime.now()
     cycletime=sysData[M]['Experiment']['cycleTime']*1.05 #Marginally longer than experiment cycle time.
-    
+
+    PUMP_MIN_ONTIME = 0.6  # segundos mínimos para que el motor desplace fluido realmente
     Ontime=cycletime*abs(sysData[M][item]['target'])
-    
-    if (sysData[M][item]['target']>0 and currentThread==sysDevices[M][item]['threadCount']): #Forward direction
+    if 0 < Ontime < PUMP_MIN_ONTIME:
+        Ontime = 0.0  # Pulso demasiado corto: omitir; integrador acumula en el próximo ciclo
+
+    if (Ontime > 0 and sysData[M][item]['target']>0 and currentThread==sysDevices[M][item]['threadCount']): #Forward direction
         sysDevices[M][item]['active']=1
         setPWM(M,'Pumps',sysItems[item]['In1'],1.0*float(sysData[M][item]['ON']),0)
         setPWM(M,'Pumps',sysItems[item]['In2'],0.0*float(sysData[M][item]['ON']),0)
         sysDevices[M][item]['active']=0
-    elif (sysData[M][item]['target']<0 and currentThread==sysDevices[M][item]['threadCount']): #Reverse direction
+    elif (Ontime > 0 and sysData[M][item]['target']<0 and currentThread==sysDevices[M][item]['threadCount']): #Reverse direction
         sysDevices[M][item]['active']=1
         setPWM(M,'Pumps',sysItems[item]['In1'],0.0*float(sysData[M][item]['ON']),0)
         setPWM(M,'Pumps',sysItems[item]['In2'],1.0*float(sysData[M][item]['ON']),0)
         sysDevices[M][item]['active']=0
-  
-    time.sleep(Ontime)
+
+    if Ontime > 0:
+        time.sleep(Ontime)
     
     if(abs(sysData[M][item]['target'])!=1 and currentThread==sysDevices[M][item]['threadCount']): #Turn off at end of Ontime
         sysDevices[M][item]['active']=1
@@ -2179,18 +2184,20 @@ def RegulateOD(M):
         #Next Section is Integral Control
         ODerror=ODNow-ODTarget
         # Integrator 1 - resoponsible for short-term integration to overcome troubles if an input pump makes a poor seal.
+        PUMP_MAX = 0.02  # Tope de Pump1; anti-windup: no acumular si ya estábamos saturados
         ODIntegral=sysData[M]['OD']['Integral']
         if ODerror<0.01:
             ODIntegral=0
-        elif (abs(ODNow-ODPast)<0.05 and ODerror>0.025): #preventing massive accidental jumps causing trouble with this integral term.
-            ODIntegral=ODIntegral+0.1*ODerror
+        elif (abs(ODNow-ODPast)<0.05 and ODerror>0.025 and Pump1Current<PUMP_MAX): #anti-windup + sin saltos bruscos
+            ODIntegral=min(ODIntegral+0.1*ODerror, PUMP_MAX)
         sysData[M]['OD']['Integral']=ODIntegral
-        # Integrator 2 
+        # Integrator 2
         ODIntegral2=sysData[M]['OD']['Integral2']
         if (abs(ODerror)>0.1 and abs(ODNow-ODPast)<0.05):
             ODIntegral2=0
         elif (abs(ODNow-ODPast)<0.1):
-            ODIntegral2=ODIntegral2+0.01*ODerror
+            if Pump1Current<PUMP_MAX:  # Anti-windup
+                ODIntegral2=min(ODIntegral2+0.01*ODerror, PUMP_MAX)
             Pump1=Pump1*0.7 #This is essentially enforcing a smaller Proportional gain when we are near to OD setpoint.
         sysData[M]['OD']['Integral2']=ODIntegral2
         

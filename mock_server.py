@@ -108,7 +108,7 @@ def _build_sysdata(device_id: str) -> dict:
         'UIDevice'       : device_id,
         'present'        : 1,
         'presentDevices' : present_devices,
-        'Version'        : {'value': 'Turbidostat V3.0', 'LED': 1},
+        'Version'        : {'value': 'Turbidostat V3.0', 'LED': 2},
         'DeviceID'       : f'MOCK-{device_id}-ABCD',
 
         'time': {'record': time_rec},
@@ -205,6 +205,7 @@ def _build_sysdata(device_id: str) -> dict:
         'LEDG'    : {'WL': '6500K','default': 0.1, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
         'LEDH'    : {'WL': '600',  'default': 0.1, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
         'LEDI'    : {'WL': '550',  'default': 0.1, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
+        'LEDV'    : {'WL': 'White','default': 0.1, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0, 'ScaleFactor': 0.4},
         'LASER650': {'name': 'LASER650', 'default': 0.5, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
         'UV'      : {'WL': 'UV',   'default': 0.5, 'target': 0.0, 'max': 1.0, 'min': 0.0, 'ON': 0},
 

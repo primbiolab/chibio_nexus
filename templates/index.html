@@ -491,12 +491,33 @@
           <span class="led-val" id="LEDFCurrent">0.00</span>
           <label class="tog" style="--led-rgb:185,28,28"><input type="checkbox" id="LEDF-tog" onchange="switchLED('LEDF',this.checked)"><span class="tog-t"></span></label>
         </div>
-        <div class="led-row" id="led-row-LEDG" style="--led-rgb:203,213,225">
+        <div class="led-row" id="led-row-LEDG" style="--led-rgb:203,213,225;display:none">
           <div class="led-name-box"><div class="led-dot" style="background:#cbd5e1;border:1px solid var(--bd)"></div><span class="led-name">6500 K</span></div>
           <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDG',-0.1)">−</button><input type="number" class="led-inp" id="LEDGInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDG',0.1)">+</button></div>
           <button class="ib ib-sm led-set-btn" id="LEDGSet" onclick="setLED('LEDG')">Set</button>
           <span class="led-val" id="LEDGCurrent">0.00</span>
           <label class="tog" style="--led-rgb:203,213,225"><input type="checkbox" id="LEDG-tog" onchange="switchLED('LEDG',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDH" style="--led-rgb:220,120,60;display:none">
+          <div class="led-name-box"><div class="led-dot" style="background:#dc7c3c"></div><span class="led-name">600 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDH',-0.1)">−</button><input type="number" class="led-inp" id="LEDHInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDH',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDHSet" onclick="setLED('LEDH')">Set</button>
+          <span class="led-val" id="LEDHCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:220,120,60"><input type="checkbox" id="LEDH-tog" onchange="switchLED('LEDH',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDI" style="--led-rgb:100,180,80;display:none">
+          <div class="led-name-box"><div class="led-dot" style="background:#64b450"></div><span class="led-name">550 nm</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDI',-0.1)">−</button><input type="number" class="led-inp" id="LEDIInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDI',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDISet" onclick="setLED('LEDI')">Set</button>
+          <span class="led-val" id="LEDICurrent">0.00</span>
+          <label class="tog" style="--led-rgb:100,180,80"><input type="checkbox" id="LEDI-tog" onchange="switchLED('LEDI',this.checked)"><span class="tog-t"></span></label>
+        </div>
+        <div class="led-row" id="led-row-LEDV" style="--led-rgb:240,240,220;display:none">
+          <div class="led-name-box"><div class="led-dot" style="background:#f0f0dc;border:1px solid var(--bd)"></div><span class="led-name">Blanco</span></div>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDV',-0.1)">−</button><input type="number" class="led-inp" id="LEDVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDV',0.1)">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDVSet" onclick="setLED('LEDV')">Set</button>
+          <span class="led-val" id="LEDVCurrent">0.00</span>
+          <label class="tog" style="--led-rgb:240,240,220"><input type="checkbox" id="LEDV-tog" onchange="switchLED('LEDV',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LASER650" style="--led-rgb:220,38,38">
           <div class="led-name-box"><div class="led-dot" style="background:#dc2626"></div><span class="led-name">Láser 650</span></div>

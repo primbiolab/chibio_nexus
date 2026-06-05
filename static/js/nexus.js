@@ -897,28 +897,43 @@ function _updateDataInner(data){
 
   /* LEDs — inicializar flag de guard */
   window._updatingLED = window._updatingLED || false;
-  ['LEDB','LEDC','LEDD','LEDF','LEDG','LASER650','UV'].forEach(function(l){
+  ['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI','LEDV','LASER650','UV'].forEach(function(l){
     if(!data[l])return;
     var on=data[l].ON===1;
     var cur=document.getElementById(l+'Current');if(cur)cur.textContent=data[l].target.toFixed(2);
     var row=document.getElementById('led-row-'+l);if(row)row.classList.toggle('on',on);
     var tog=document.getElementById(l+'-tog');if(tog){window._updatingLED=true;tog.checked=on;window._updatingLED=false;}
-    /* Poblar el input de potencia (sin pisar al usuario mientras escribe) para que "Set" no envíe vacío */
     var inp=document.getElementById(l+'Input');
     if(inp&&document.activeElement!==inp){inp.value=data[l].target.toFixed(1);}
   });
 
-  /* Opciones de LED — la fila 6500K (LEDG) se muestra siempre, igual que el software original.
-     La autodetección de versión en backend ya no controla la visibilidad de la UI. */
-  if (!window._ledVersionApplied || window._ledVersionApplied !== data.UIDevice) {
-    window._ledVersionApplied = data.UIDevice;
-    var ledRowG = document.getElementById('led-row-LEDG');
-    if (ledRowG) ledRowG.style.display = '';
-    /* Opciones de excitación en FP — incluyen 6500K */
-    var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
-                   {v:'LEDF',t:'623nm'},{v:'LEDG',t:'6500K'},{v:'LASER650',t:'Láser'}];
+  /* Visibilidad de filas LED según versión de hardware */
+  var ledVer = data.Version ? data.Version.LED : 1;
+  var versionKey = (data.UIDevice||'') + '_v' + ledVer;
+  if (!window._ledVersionApplied || window._ledVersionApplied !== versionKey) {
+    window._ledVersionApplied = versionKey;
+    if (ledVer === 1) {
+      /* V1: 6500K (LEDG) presente; no hay LEDH/LEDI/LEDV */
+      var r;
+      r=document.getElementById('led-row-LEDG');if(r)r.style.display='';
+      r=document.getElementById('led-row-LEDH');if(r)r.style.display='none';
+      r=document.getElementById('led-row-LEDI');if(r)r.style.display='none';
+      r=document.getElementById('led-row-LEDV');if(r)r.style.display='none';
+      var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
+                     {v:'LEDF',t:'623nm'},{v:'LEDG',t:'6500K'},{v:'LASER650',t:'Láser'}];
+    } else {
+      /* V2: LEDH(600nm) + LEDI(550nm) + LEDV(Blanco); no hay LEDG */
+      var r;
+      r=document.getElementById('led-row-LEDG');if(r)r.style.display='none';
+      r=document.getElementById('led-row-LEDH');if(r)r.style.display='';
+      r=document.getElementById('led-row-LEDI');if(r)r.style.display='';
+      r=document.getElementById('led-row-LEDV');if(r)r.style.display='';
+      var ledOpts = [{v:'LEDB',t:'457nm'},{v:'LEDC',t:'500nm'},{v:'LEDD',t:'523nm'},
+                     {v:'LEDF',t:'623nm'},{v:'LEDH',t:'600nm'},{v:'LEDI',t:'550nm'},
+                     {v:'LEDV',t:'Blanco'},{v:'LASER650',t:'Láser'}];
+    }
     var optsHtml = ledOpts.map(function(o){return '<option value="'+o.v+'">'+o.t+'</option>';}).join('');
-    ['FPExcite1','FPExcite2','FPExcite3'].forEach(function(id){
+    ['FPExcite1','FPExcite2','FPExcite3','LightExcite1'].forEach(function(id){
       var el=document.getElementById(id);if(el)el.innerHTML=optsHtml;
     });
   }
