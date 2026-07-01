@@ -1,0 +1,14 @@
+# Normalizar line endings al hacer checkout
+* text=auto
+
+# Scripts de shell: siempre LF (Linux/BeagleBone)
+*.sh text eol=lf
+
+# PowerShell: siempre CRLF (Windows)
+*.ps1 text eol=crlf
+
+# Python y web: LF
+*.py  text eol=lf
+*.js  text eol=lf
+*.css text eol=lf
+*.html text eol=lf

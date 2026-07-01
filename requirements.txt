@@ -1,0 +1,13 @@
+# Chi.Bio Nexus — BeagleBone Black
+# Instalar con: pip install -r requirements.txt
+#
+# IMPORTANTE: fijar versiones exactas ejecutando en la BeagleBone:
+#   pip freeze > requirements.lock.txt
+# y usar ese archivo para deploys reproducibles.
+
+flask
+gunicorn
+numpy
+Adafruit-GPIO
+Adafruit-BBIO
+smbus2
