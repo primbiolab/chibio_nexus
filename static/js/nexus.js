@@ -263,6 +263,35 @@ document.addEventListener('fullscreenchange', _updateFullscreenIcon);
 document.addEventListener('webkitfullscreenchange', _updateFullscreenIcon);
 document.addEventListener('mozfullscreenchange', _updateFullscreenIcon);
 
+// ── Modo solo gráficas (oculta col-l/col-r; solo pestaña Main) ──
+function toggleChartsOnly(){
+  var page = document.getElementById('page');
+  if(!page) return;
+  var on = page.classList.toggle('charts-only');
+  var btn = document.getElementById('chartsOnlyBtn');
+  if(btn){
+    btn.classList.toggle('active', on);
+    var ico = btn.querySelector('i');
+    if(ico) ico.className = on ? 'fa-solid fa-compress' : 'fa-solid fa-expand';
+  }
+  // Google Charts no reflowean al cambiar el ancho del contenedor → redibujar
+  if(_lastData){ _drawAllCharts(_lastData); }
+}
+
+document.addEventListener('keydown', function(e){
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  var t = e.target;
+  if(t && (t.tagName==='INPUT' || t.tagName==='TEXTAREA' || t.tagName==='SELECT' || t.isContentEditable)) return;
+  if(_nexusTab !== 'main') return;
+  var page = document.getElementById('page');
+  if(!page) return;
+  if(e.key==='g' || e.key==='G'){
+    toggleChartsOnly();
+  } else if(e.key==='Escape' && page.classList.contains('charts-only')){
+    toggleChartsOnly();
+  }
+});
+
 // Actualizar el ícono de tema al cargar
 document.addEventListener('DOMContentLoaded', function() {
   var th = localStorage.getItem('chibio-theme') || 'dark';
@@ -357,12 +386,14 @@ function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,ser
   data.addColumn('number',xLabel||'Time');
   filteredNames.forEach(function(n){data.addColumn('number',n);});
 
+  /* Parsear cada serie UNA vez (antes: se re-parseaba por fila → O(filas²×series)) */
+  var parsedSeries=filteredSeries.map(function(s){return _parseRecordStr(s+'');});
   for(var t=0;t<tArr.length;t++){
     var row=[tArr[t]];
-    filteredSeries.forEach(function(s){
-      var arr=_parseRecordStr(s+'');
+    for(var si=0;si<parsedSeries.length;si++){
+      var arr=parsedSeries[si];
       row.push(arr[t]!==undefined?arr[t]:null);
-    });
+    }
     data.addRow(row);
   }
 
@@ -497,6 +528,7 @@ function toast(m, t) {
 function ajax(u,cb){
   $.ajax({
     type:'POST', url:u, timeout:5000,
+    headers:{'X-Requested-With':'XMLHttpRequest'},
     success:function(r){ if(cb)cb(r); _pollTick(); },
     error:function(){}
   });
@@ -632,7 +664,7 @@ async function analyzeProtocol(){
   try {
     var resp = await fetch('/analyzeProtocol/', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       body: JSON.stringify({}),
       signal: ctrl.signal
     });
@@ -1485,6 +1517,10 @@ var MAIN_TOUR_STEPS = [
   { sel:'#global-buttons',
     title:'Tema visual y tour',
     desc:'El botón de luna alterna entre el modo oscuro y el claro. Tu preferencia se guarda automáticamente entre sesiones. El botón amarillo relanza este tour cuando quieras.',
+    pos:'bottom' },
+  { sel:'#chartsOnlyBtn',
+    title:'Modo solo gráficas',
+    desc:'Oculta los paneles laterales, el programa Custom y la fluorescencia para dejar en pantalla únicamente las gráficas y esta barra superior — ideal para monitorear a distancia. Actívalo con este botón o la tecla G, y presiona Esc para volver.',
     pos:'bottom' },
   { sel:'#cloud-pill',
     title:'Estado del protocolo',

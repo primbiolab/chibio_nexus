@@ -2,6 +2,7 @@
 
 #Import required python packages
 import os
+import ast
 import random
 import time
 import math
@@ -17,6 +18,8 @@ import Adafruit_BBIO.GPIO as GPIO
 import copy
 import csv
 import smbus2 as smbus
+from collections import OrderedDict
+from prompts import GENERATE_PROTOCOL_SYSTEM
 
 
 # ── Estado interno del protocolo inyectado vía Nexus ───────────────
@@ -33,6 +36,13 @@ application.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 @application.after_request
 def add_security_headers(response):
+    # HF-15: 'unsafe-inline' en script-src se mantiene porque las plantillas usan
+    # ~130 manejadores inline (onclick/oninput/…) que los nonces CSP NO cubren;
+    # quitarlo exige recablear todos con addEventListener (baja prioridad, diferido).
+    # Endurecemos con directivas de bajo riesgo que sí acotan superficie:
+    #   object-src 'none' (sin plugins), base-uri 'self' (sin <base> injection),
+    #   frame-ancestors 'self' (anti-clickjacking; el iframe del Architect es same-origin),
+    #   form-action 'self'.
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
         "script-src 'self' https://ajax.googleapis.com https://www.gstatic.com "
@@ -40,7 +50,11 @@ def add_security_headers(response):
         "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com 'unsafe-inline'; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data:; "
-        "connect-src 'self' https://camera.primbiolab.org wss://camera.primbiolab.org;"
+        "connect-src 'self' https://camera.primbiolab.org wss://camera.primbiolab.org; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'self'; "
+        "form-action 'self';"
     )
     return response
 
@@ -51,27 +65,79 @@ def block_mobile():
     if any(kw in ua for kw in mobile_keywords):
         return render_template('mobile_blocked.html'), 403
 
+@application.before_request
+def block_csrf():
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return jsonify({'error': 'CSRF: missing X-Requested-With header'}), 403
+
+@application.before_request
+def validate_path_params():
+    args = request.view_args or {}
+    if 'M' in args:
+        v = str(args['M'])
+        if v != '0' and v not in _VALID_M:
+            return jsonify({'error': 'M inválido'}), 400
+    if 'which' in args:
+        # 'which' está sobrecargado: /scanDevices usa 'all'; /MeasureTemp/<which>
+        # usa nombres de termómetro (Internal/External/IR). Permitir ambos.
+        v = str(args['which'])
+        if v != 'all' and v not in _VALID_M and v not in {'Internal', 'External', 'IR'}:
+            return jsonify({'error': 'which inválido'}), 400
+    if 'Program' in args:
+        if str(args['Program']) not in _VALID_PROGRAMS:
+            return jsonify({'error': 'Program inválido'}), 400
+    for key in ('Status', 'value', 'value2'):
+        if key in args:
+            try:
+                float(args[key])
+            except ValueError:
+                return jsonify({'error': key + ' inválido'}), 400
+
 lock=Lock()
 
 # ── Cache de análisis Gemini {hash_code: analysis_text} ──────────
-_gemini_cache = {}
+_gemini_cache = OrderedDict()
 # ── Cache de generación Gemini {hash_prompt: ast_json} ───────────
-_gemini_ast_cache = {}
+_gemini_ast_cache = OrderedDict()
+_GEMINI_CACHE_MAX = 128   # tope de entradas por caché (evita OOM en la BBB)
 # ── Rate-limit simple: {ip: [timestamp, ...]} ────────────────────
 _gemini_rate  = {}
 _gemini_rate_lock = Lock()
 _RATE_WINDOW  = 60   # segundos
 _RATE_LIMIT   = 10   # llamadas por ventana
 
+def _cache_put(cache, key, value):
+    # inserción con tope: descarta la entrada más vieja pasado el límite
+    cache[key] = value
+    while len(cache) > _GEMINI_CACHE_MAX:
+        cache.popitem(last=False)
+
+def _client_ip():
+    # Detrás de Cloudflare, request.remote_addr es siempre 127.0.0.1.
+    # Usar el IP real del cliente para keyear el rate-limit por-usuario.
+    cf = request.headers.get('CF-Connecting-IP')
+    if cf:
+        return cf.strip()
+    xff = request.headers.get('X-Forwarded-For')
+    if xff:
+        return xff.split(',')[0].strip()
+    return request.remote_addr or 'unknown'
+
 def _gemini_rate_ok(ip):
     import time as _time
     now = _time.time()
     with _gemini_rate_lock:
+        # purga IPs cuyas marcas expiraron (evita crecer claves sin límite)
+        for k in [k for k, ts in _gemini_rate.items()
+                  if all(now - t >= _RATE_WINDOW for t in ts)]:
+            del _gemini_rate[k]
         hits = [t for t in _gemini_rate.get(ip, []) if now - t < _RATE_WINDOW]
-        _gemini_rate[ip] = hits
         if len(hits) >= _RATE_LIMIT:
+            _gemini_rate[ip] = hits
             return False
-        _gemini_rate[ip].append(now)
+        hits.append(now)
+        _gemini_rate[ip] = hits
         return True
         
 #Initialise data structures.
@@ -110,7 +176,7 @@ sysData = {'M0' : {
    'Chemostat' : {'ON' : 0, 'p1' : 0.0, 'p2' : 0.1},
    'Zigzag': {'ON' : 0, 'Zig' : 0.04,'target' : 0.0,'SwitchPoint' : 0},
    'GrowthRate': {'current' : 0.0,'record' : [],'default' : 2.0},
-   'Volume' : {'target' : 20.0,'max' : 20.0, 'min' : 0.0,'ON' : 0},
+   'Volume' : {'target' : 20.0,'max' : 20.0, 'min' : 0.1,'ON' : 0},
    'Pump1' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},
    'Pump2' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},
    'Pump3' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},
@@ -212,7 +278,15 @@ sysItems = {
         '0x13' : {'A' : 'FLICKER', 'B' : 'NIR'},
     }
 }
-   
+
+def _resolveM(M):
+    M = str(M)
+    return sysItems['UIDevice'] if M == "0" else M
+
+_VALID_M = frozenset({'M0','M1','M2','M3','M4','M5','M6','M7'})
+_VALID_PROGRAMS = frozenset({'C1','C2','C3','C4','C5','C6','C7','C8'})
+# Q7: salidas cuyo actuado es un set-PWM directo (target*ON), sin lógica especial.
+_SIMPLE_PWM = frozenset({'Heat','UV','LEDC','LEDD','LEDF','LEDG','LEDH'})
 
 
 # This section of code is responsible for the watchdog circuit. The circuit is implemented in hardware on the control computer, and requires the watchdog pin be toggled low->high each second, otherwise it will power down all connected devices. This section is therefore critical to operation of the device.
@@ -234,9 +308,9 @@ def toggleWatchdog():
     time.sleep(0.05)
     GPIO.output(sysItems['Watchdog']['pin'], GPIO.LOW)
 
-def _nexus_exec(M, code, program):
+def _fsm_dedent(code):
     """
-    Transforma y ejecuta el código FSM generado por Chi.Bio Architect.
+    Transforma el código FSM generado por Chi.Bio Architect para ejecución directa.
 
     El compilador produce bloques con esta estructura:
         elif (program == "C8"):
@@ -257,7 +331,90 @@ def _nexus_exec(M, code, program):
         if line.startswith('    '):
             line = line[4:]
         fixed.append(line)
-    executable = '\n'.join(fixed)
+    return '\n'.join(fixed)
+
+
+# ── Validador AST del FSM inyectado ─────────────────────────────────
+# El código generado por compileFSM (architect.js) solo usa un subconjunto
+# fijo de Python. Cualquier nodo fuera de esta allowlist se rechaza antes
+# de exec() — en particular, ningún atributo con nombre "_..." puede
+# aparecer (bloquea el escape __globals__/__class__/__builtins__).
+_ALLOWED_AST_NODES = (
+    ast.Module, ast.If, ast.Compare, ast.BoolOp,
+    ast.Assign, ast.AugAssign,
+    ast.Call, ast.Attribute, ast.Subscript,
+    ast.Constant, ast.BinOp, ast.UnaryOp,
+    ast.JoinedStr, ast.FormattedValue,
+    ast.Pass, ast.Expr, ast.Tuple, ast.List, ast.Dict, ast.Name, ast.Load, ast.Store,
+    ast.Index, ast.Slice,
+    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.USub, ast.UAdd,
+    ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.And, ast.Or, ast.Not,
+    ast.keyword,
+)
+_ALLOWED_CALLS = {
+    'SetOutputOn', 'SetOutputTarget', 'MeasureOD', 'MeasureTemp', 'MeasureFP',
+    'addTerminal', 'RegulateOD',
+    'range', 'len', 'int', 'float', 'str', 'bool', 'min', 'max', 'round', 'abs',
+}
+_ALLOWED_ATTR_CALLS = {'sleep', 'get'}
+_DENIED_NAMES = {
+    'eval', 'exec', 'compile', 'open', '__import__', 'getattr', 'setattr',
+    'delattr', 'vars', 'globals', 'locals', 'input', 'breakpoint',
+    'memoryview', 'object', 'type', 'help', 'classmethod', 'staticmethod',
+    'super', 'property',
+}
+
+def _validate_protocol_ast(tree):
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_AST_NODES):
+            raise ValueError('Construcción no permitida: ' + type(node).__name__)
+        if isinstance(node, ast.Attribute) and node.attr.startswith('_'):
+            raise ValueError('Acceso a atributo no permitido: ' + node.attr)
+        if isinstance(node, ast.Name) and node.id in _DENIED_NAMES:
+            raise ValueError('Nombre no permitido: ' + node.id)
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                if func.id not in _ALLOWED_CALLS:
+                    raise ValueError('Llamada no permitida: ' + func.id)
+            elif isinstance(func, ast.Attribute):
+                if func.attr not in _ALLOWED_ATTR_CALLS:
+                    raise ValueError('Llamada no permitida: .' + func.attr)
+            else:
+                raise ValueError('Forma de llamada no permitida')
+
+
+# ── Sleep acotado para el protocolo inyectado (HF-06) ────────────────
+# El validador AST permite `time.sleep(...)` (lo usa el codegen del Architect
+# para bloques de espera), pero `time.sleep(1e9)` congelaría el hilo del
+# experimento de forma permanente. Inyectamos este shim en lugar del módulo
+# `time` real: solo expone `sleep`, y lo acota a _MAX_PROTOCOL_SLEEP.
+_MAX_PROTOCOL_SLEEP = 3600.0  # segundos (1 h) — cota superior por llamada
+
+class _SafeTime:
+    @staticmethod
+    def sleep(seconds):
+        try:
+            s = float(seconds)
+        except (TypeError, ValueError):
+            # No silenciar: una espera inválida colapsa el timing del protocolo.
+            print(str(datetime.now()) + ' [NEXUS] sleep() con duración inválida (ignorada): ' + repr(seconds))
+            return
+        time.sleep(max(0.0, min(s, _MAX_PROTOCOL_SLEEP)))
+
+
+def _nexus_exec(M, code, program):
+    executable = _fsm_dedent(code)
+    try:
+        _validate_protocol_ast(ast.parse(executable))
+    except (SyntaxError, ValueError) as e:
+        err = '[NEXUS] Protocolo rechazado: ' + str(e)
+        addTerminal(M, err)
+        print(str(datetime.now()) + ' ' + err)
+        with _cloud_lock:
+            _cloud['status']    = 'error'
+            _cloud['error_msg'] = str(e)
+        return
 
     _safe_builtins = {
         'range': range, 'len': len, 'int': int, 'float': float,
@@ -271,7 +428,7 @@ def _nexus_exec(M, code, program):
             'sysData'        : sysData,
             'M'              : M,
             'program'        : program,
-            'time'           : time,
+            'time'           : _SafeTime,
             'math'           : math,
             'abs'            : abs,
             'datetime'       : datetime,
@@ -321,46 +478,26 @@ def initialise(M):
     sysData[M]['LASER650']['target']=sysData[M]['LASER650']['default']
     sysData[M]['LASER650']['ON']=0
     
-    FP='FP1'
-    sysData[M][FP]['ON']=0
-    sysData[M][FP]['LED']="LEDB"
-    sysData[M][FP]['Base']=0
-    sysData[M][FP]['Emit1']=0
-    sysData[M][FP]['Emit2']=0
-    sysData[M][FP]['BaseBand']="CLEAR"
-    sysData[M][FP]['Emit1Band']="nm510"
-    sysData[M][FP]['Emit2Band']="nm550"
-    sysData[M][FP]['Gain']="x10"
-    sysData[M][FP]['BaseRecord']=[]
-    sysData[M][FP]['Emit1Record']=[]
-    sysData[M][FP]['Emit2Record']=[]
-    FP='FP2'
-    sysData[M][FP]['ON']=0
-    sysData[M][FP]['LED']="LEDD"
-    sysData[M][FP]['Base']=0
-    sysData[M][FP]['Emit1']=0
-    sysData[M][FP]['Emit2']=0
-    sysData[M][FP]['BaseBand']="CLEAR"
-    sysData[M][FP]['Emit1Band']="nm583"
-    sysData[M][FP]['Emit2Band']="nm620"
-    sysData[M][FP]['BaseRecord']=[]
-    sysData[M][FP]['Emit1Record']=[]
-    sysData[M][FP]['Emit2Record']=[]
-    sysData[M][FP]['Gain']="x10"
-    FP='FP3'
-    sysData[M][FP]['ON']=0
-    sysData[M][FP]['LED']="LEDF"
-    sysData[M][FP]['Base']=0
-    sysData[M][FP]['Emit1']=0
-    sysData[M][FP]['Emit2']=0
-    sysData[M][FP]['BaseBand']="CLEAR"
-    sysData[M][FP]['Emit1Band']="nm620"
-    sysData[M][FP]['Emit2Band']="nm670"
-    sysData[M][FP]['BaseRecord']=[]
-    sysData[M][FP]['Emit1Record']=[]
-    sysData[M][FP]['Emit2Record']=[]
-    sysData[M][FP]['Gain']="x10"
- 
+    # Q5: los 3 FP solo difieren en LED / Emit1Band / Emit2Band — tabla + loop.
+    FP_INIT = {
+        'FP1': {'LED': 'LEDB', 'Emit1Band': 'nm510', 'Emit2Band': 'nm550'},
+        'FP2': {'LED': 'LEDD', 'Emit1Band': 'nm583', 'Emit2Band': 'nm620'},
+        'FP3': {'LED': 'LEDF', 'Emit1Band': 'nm620', 'Emit2Band': 'nm670'},
+    }
+    for FP, cfg in FP_INIT.items():
+        sysData[M][FP]['ON']=0
+        sysData[M][FP]['LED']=cfg['LED']
+        sysData[M][FP]['Base']=0
+        sysData[M][FP]['Emit1']=0
+        sysData[M][FP]['Emit2']=0
+        sysData[M][FP]['BaseBand']="CLEAR"
+        sysData[M][FP]['Emit1Band']=cfg['Emit1Band']
+        sysData[M][FP]['Emit2Band']=cfg['Emit2Band']
+        sysData[M][FP]['Gain']="x10"
+        sysData[M][FP]['BaseRecord']=[]
+        sysData[M][FP]['Emit1Record']=[]
+        sysData[M][FP]['Emit2Record']=[]
+
     for PUMP in ['Pump1','Pump2','Pump3','Pump4']:
         sysData[M][PUMP]['default']=0.0;
         sysData[M][PUMP]['target']=sysData[M][PUMP]['default']
@@ -630,7 +767,22 @@ def getSysdata():
         'error_msg'    : _cloud['error_msg'],
         'inject_count' : _cloud['inject_count'],
     }
-    return jsonify(outputdata)
+    # HF-08: sysData lo mutan hilos de fondo (runExperiment append, downsample).
+    # Serializar el dict vivo puede lanzar RuntimeError ("changed size during
+    # iteration") o dar un snapshot inconsistente. Tomamos una copia inmutable y
+    # reintentamos si una mutación concurrente rompe la copia; luego el jsonify
+    # opera sobre el snapshot ya estático. (Costo: un deepcopy por poll; los
+    # arrays 'record' están acotados por el downsample periódico.)
+    snapshot = None
+    for _ in range(4):
+        try:
+            snapshot = copy.deepcopy(outputdata)
+            break
+        except RuntimeError:
+            time.sleep(0.02)
+    if snapshot is None:
+        snapshot = copy.deepcopy(outputdata)  # último intento; si falla, propaga a 500
+    return jsonify(snapshot)
 
 @application.route('/getCloudStatus/')
 def getCloudStatus():
@@ -702,9 +854,7 @@ def addTerminal(M,strIn):
 def clearTerminal(M):
     #Deletes everything from the terminal.
     global sysData
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
         
     sysData[M]['Terminal']['text']=[]
     addTerminal(M,'Terminal Cleared')
@@ -754,9 +904,7 @@ def SetOutputTarget(M,item, value):
     if item not in _ALLOWED_OUTPUT_ITEMS:
         return jsonify({'error': 'Item no permitido'}), 400
     value = float(value)
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     print(str(datetime.now()) + " Set item: " + str(item) + " to value " + str(value) + " on " + str(M))
     if (value<sysData[M][item]['min']):
         value=sysData[M][item]['min']
@@ -784,9 +932,7 @@ def SetOutputOn(M,item,force):
         return jsonify({'error': 'Item no permitido'}), 400
     
     force = int(force)
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     #The first statements are to force it on or off it the command is called in force mode (force implies it sets it to a given state, regardless of what it is currently in)
     if (force==1):
         sysData[M][item]['ON']=1
@@ -810,6 +956,25 @@ def SetOutputOn(M,item,force):
         return ('', 204)    
 
 
+def _stirRamp(M,item):
+    #Arranque del agitador con pulsos escalonados (~3s de sleeps) para que el
+    #motor no se cale al iniciar a baja potencia. Corre en un hilo (ver SetOutput)
+    #para no bloquear el worker HTTP durante el ramp (HF-06).
+    if (sysData[M][item]['target']*float(sysData[M][item]['ON'])>0):
+        setPWM(M,'PWM',sysItems[item],1.0*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
+        time.sleep(1.5)
+
+        if (sysData[M][item]['target']>0.4 and sysData[M][item]['ON']==1):
+            setPWM(M,'PWM',sysItems[item],0.5*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
+            time.sleep(0.75)
+
+        if (sysData[M][item]['target']>0.8 and sysData[M][item]['ON']==1):
+            setPWM(M,'PWM',sysItems[item],0.7*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
+            time.sleep(0.75)
+
+    setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
+
+
 def SetOutput(M,item):
     #Here we actually do the digital communications required to set a given output. This function is called by SetOutputOn above as required.
     global sysData
@@ -819,26 +984,16 @@ def SetOutput(M,item):
     if sysData[M]['present'] == 0:
         return
     #We go through each different item and set it going as appropriate.
-    if(item=='Stir'): 
-        #Stirring is initiated at a high speed for a couple of seconds to prevent the stir motor from stalling (e.g. if it is started at an initial power of 0.3)
-        if (sysData[M][item]['target']*float(sysData[M][item]['ON'])>0):
-            setPWM(M,'PWM',sysItems[item],1.0*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
-            time.sleep(1.5)
+    if(item=='Stir'):
+        #Stirring is initiated at a high speed for a couple of seconds to prevent the stir motor from stalling.
+        #El ramp hace ~3s de sleeps → se despacha en un hilo daemon para no colgar el worker (HF-06).
+        _t=Thread(target=_stirRamp, args=(M,item))
+        _t.setDaemon(True)
+        _t.start()
 
-            if (sysData[M][item]['target']>0.4 and sysData[M][item]['ON']==1):
-                setPWM(M,'PWM',sysItems[item],0.5*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
-                time.sleep(0.75)
-            
-            if (sysData[M][item]['target']>0.8 and sysData[M][item]['ON']==1):
-                setPWM(M,'PWM',sysItems[item],0.7*float(sysData[M][item]['ON']),0) # This line is to just get stirring started briefly.
-                time.sleep(0.75)
 
-        setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
-        
-        
-    elif(item=='Heat'):
-        setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
-    elif(item=='UV'):
+    elif item in _SIMPLE_PWM:
+        # Q7: Heat/UV/LEDC/D/F/G/H comparten el mismo set-PWM directo (target*ON).
         setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
     elif (item=='Thermostat'):
         sysDevices[M][item]['thread']=Thread(target = Thermostat, args=(M,item))
@@ -867,8 +1022,6 @@ def SetOutput(M,item):
         if (sysData[M]['Zigzag']['ON']==1):
             sysData[M]['OD']['ON']=0
     
-    elif (item=='LEDC' or item=='LEDD' or item=='LEDF' or item=='LEDG' or item == 'LEDH'):
-        setPWM(M,'PWM',sysItems[item],sysData[M][item]['target']*float(sysData[M][item]['ON']),0)
     elif (item=='LEDB' or item == 'LEDI'): #We must handle these differently in case they are simultaneously being used to mix with LEDV
         if (sysData[M]['LEDV']['target']*float(sysData[M]['LEDV']['ON'])>0): #If LEDV is on, we need to make up the difference in these other LEDs.
             # First determine what is the intensity for this LED required to maintain current LEDV level. Note we have alreayd checked that LEDV is on.
@@ -1123,9 +1276,7 @@ def direction(M,item):
     item = str(item)
     if item not in _ALLOWED_PUMPS:
         return jsonify({'error': 'Item no permitido'}), 400
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     sysData[M][item]['direction']=-1.0*sysData[M][item]['direction']
     if sysData[M][item]['target']!=0.0:
         sysData[M][item]['target']=-1.0*sysData[M][item]['target']
@@ -1245,9 +1396,7 @@ def GetSpectrum(M,Gain):
         return jsonify({'error': 'Gain format invalid, expected xN (e.g. x4)'}), 400
     global sysData
     global sysItems
-    M=str(M)   
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     out=GetLight(M,['nm410','nm440','nm470','nm510','nm550','nm583'],Gain,255)
     out2=GetLight(M,['nm620', 'nm670','CLEAR','NIR','DARK'],Gain,255)
     sysData[M]['AS7341']['spectrum']['nm410']=out[0]
@@ -1568,9 +1717,7 @@ def CharacteriseDevice2(M):
     global sysData
     global sysItems
     print('In1')
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
         
     result= { 'LEDB' : {'nm410' : [],'nm440' : [],'nm470' : [],'nm510' : [],'nm550' : [],'nm583' : [],'nm620' : [],'nm670' : [],'CLEAR' : []},
         'LEDC' : {'nm410' : [],'nm440' : [],'nm470' : [],'nm510' : [],'nm550' : [],'nm583' : [],'nm620' : [],'nm670' : [],'CLEAR' : []},
@@ -1747,9 +1894,7 @@ def CalibrateOD(M,item,value,value2):
     item = str(item)
     ODRaw = float(value)
     ODActual = float(value2)
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
         
     device=sysData[M]['OD']['device']
     if (device=='LASER650'):
@@ -1773,23 +1918,10 @@ def CalibrateOD(M,item,value,value2):
         sysData[M][item]['target']=OD0
         print(str(datetime.now()) + "Calibrated OD")
     elif (device=='LEDF'):
-        a=sysData[M]['OD0']['LEDFa']#Retrieve the calibration factors for OD.
-        
         if (ODActual<0):
             ODActual=0
             print("You put a negative OD into calibration! Setting it to 0")
-        if (M=='M0'):
-            CF=1299.0
-        elif (M=='M1'):
-            CF=1206.0
-        elif (M=='M2'):
-            CF=1660.0
-        elif (M=='M3'):
-            CF=1494.0
-            
-        #raw=(ODActual)/a  #THis is performing the inverse function of the linear OD calibration.
-        #OD0=ODRaw - raw*CF
-        OD0=ODRaw/ODActual
+        OD0=ODRaw/ODActual  #Q3: 'a'(LEDFa) y CF se calculaban pero nunca se leían — eliminados.
         print(OD0)
     
         if (OD0<sysData[M][item]['min']):
@@ -1802,23 +1934,10 @@ def CalibrateOD(M,item,value,value2):
         sysData[M][item]['target']=OD0
         print("Calibrated OD")
     elif (device=='LEDA'):
-        a=sysData[M]['OD0']['LEDAa']#Retrieve the calibration factors for OD.
-        
         if (ODActual<0):
             ODActual=0
             print("You put a negative OD into calibration! Setting it to 0")
-        if (M=='M0'):
-            CF=422
-        elif (M=='M1'):
-            CF=379
-        elif (M=='M2'):
-            CF=574
-        elif (M=='M3'):
-            CF=522
-            
-        #raw=(ODActual)/a  #THis is performing the inverse function of the linear OD calibration.
-        #OD0=ODRaw - raw*CF
-        OD0=ODRaw/ODActual
+        OD0=ODRaw/ODActual  #Q3: 'a'(LEDAa) y CF se calculaban pero nunca se leían — eliminados.
         print(OD0)
     
         if (OD0<sysData[M][item]['min']):
@@ -1840,9 +1959,7 @@ def MeasureOD(M):
     #Measures laser transmission and calculates calibrated OD from this.
     global sysData
     global sysItems
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     device=sysData[M]['OD']['device']
     if (device=='LASER650'):
         out=GetTransmission(M,'LASER650',['CLEAR'],1,255)
@@ -1860,44 +1977,29 @@ def MeasureOD(M):
         out=GetTransmission(M,'LEDF',['CLEAR'],7,255)
 
         sysData[M]['OD0']['raw']=out[0]
-        a=sysData[M]['OD0']['LEDFa']#Retrieve the calibration factors for OD.
         try:
-            if (M=='M0'):
-                CF=1299.0
-            elif (M=='M1'):
-                CF=1206.0
-            elif (M=='M2'):
-                CF=1660.0
-            elif (M=='M3'):
-                CF=1494.0
-            #raw=out[0]/CF - sysData[M]['OD0']['target']/CF
+            #Q3: 'a'(LEDFa) y CF se calculaban pero nunca se leían — eliminados.
             raw=out[0]/sysData[M]['OD0']['target']
             sysData[M]['OD']['current']=raw
-        except:
-            sysData[M]['OD']['current']=0;
-            print(str(datetime.now()) + ' OD Measurement exception on ' + str(device))
+        except Exception as e:
+            sysData[M]['OD']['current']=0
+            err='[NEXUS] Fallo de medición OD en ' + str(device) + ': ' + str(e)
+            addTerminal(M, err)
+            print(str(datetime.now()) + ' ' + err)
 
     elif (device=='LEDA'):
         out=GetTransmission(M,'LEDA',['CLEAR'],7,255)
 
         sysData[M]['OD0']['raw']=out[0]
-        a=sysData[M]['OD0']['LEDAa']#Retrieve the calibration factors for OD.
         try:
-            if (M=='M0'):
-                CF=422.0
-            elif (M=='M1'):
-                CF=379.0
-            elif (M=='M2'):
-                CF=574.0
-            elif (M=='M3'):
-                CF=522.0
-            #raw=out[0]/CF - sysData[M]['OD0']['target']/CF
+            #Q3: 'a'(LEDAa) y CF se calculaban pero nunca se leían — eliminados.
             raw=out[0]/sysData[M]['OD0']['target']
-            #sysData[M]['OD']['current']=raw*a
             sysData[M]['OD']['current']=raw
-        except:
-            sysData[M]['OD']['current']=0;
-            print(str(datetime.now()) + ' OD Measurement exception on ' + str(device))
+        except Exception as e:
+            sysData[M]['OD']['current']=0
+            err='[NEXUS] Fallo de medición OD en ' + str(device) + ': ' + str(e)
+            addTerminal(M, err)
+            print(str(datetime.now()) + ' ' + err)
     
     return ('', 204)  
     
@@ -1906,9 +2008,7 @@ def MeasureOD(M):
 def MeasureFP(M):
     #Responsible for measuring each of the active Fluorescent proteins.
     global sysData
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
     for FP in ['FP1','FP2','FP3']:
         if sysData[M][FP]['ON']==1:
             Gain=int(sysData[M][FP]['Gain'][1:])
@@ -1931,10 +2031,8 @@ def MeasureTemp(M,which):
     #Used to measure temperature from each thermometer.
     global sysData
     global sysItems
-   
-    if (M=="0"):
-        M=sysItems['UIDevice']
-    M=str(M)
+
+    M=_resolveM(M)
     which='Thermometer' + str(which)
     if (which=='ThermometerInternal' or which=='ThermometerExternal'):
         getData=I2CCom(M,which,1,16,0x05,0,0)
@@ -2175,7 +2273,11 @@ def RegulateOD(M):
         
     errorTerm=ODTarget-ODNow
     Volume=sysData[M]['Volume']['target']
-    
+    if (Volume<=0): #Evita ZeroDivisionError; Volume<=0 es anómalo (min=0.1).
+        #Clampar al min configurado, no a ~0 (1e-6 daría ganancia 4*60/1e-6 ≈ 2.4e8).
+        Volume=sysData[M]['Volume']['min']
+        addTerminal(M, '[NEXUS] Volume<=0 inesperado; usando el mínimo (' + str(Volume) + ')')
+
     PercentPerMin=4*60/Volume #Gain parameter to convert from pump rate to rate of OD reduction.
 
     if sysData[M]['Experiment']['cycles']<3:
@@ -2315,9 +2417,7 @@ def ExperimentStartStop(M,value):
     global sysData
     global sysDevices
     global sysItems
-    M=str(M)
-    if (M=="0"):
-        M=sysItems['UIDevice']
+    M=_resolveM(M)
        
     value=int(value)
     #Turning it on involves keeping current pump directions,
@@ -2404,9 +2504,20 @@ def runExperiment(M,placeholder):
         return
     sysData[M]['OD']['Measuring']=0
     if (sysData[M]['OD']['ON']==1):
-        RegulateOD(M) #Function that calculates new target pump rates, and sets pumps to desired rates. 
-    
-    LightActuation(M,1) 
+        try:
+            RegulateOD(M) #Function that calculates new target pump rates, and sets pumps to desired rates.
+        except Exception as e:
+            # Fallo en RegulateOD: apagar y DETENER el experimento. Sin el
+            # return el ciclo seguía (LightActuation, re-encender Stir) y el
+            # siguiente ciclo re-disparaba el fallo → churn off/on indefinido.
+            err = '[NEXUS] ERROR RegulateOD, deteniendo experimento: ' + str(e)
+            addTerminal(M, err)
+            print(str(datetime.now()) + ' ' + err)
+            turnEverythingOff(M)
+            sysData[M]['Experiment']['ON'] = 0
+            return
+
+    LightActuation(M,1)
     
     if (sysData[M]['Custom']['ON']==1): #Check if we have enabled custom programs
         CustomThread=Thread(target = CustomProgram, args=(M,)) #We run this in a thread in case we are doing something slow, we dont want to hang up the main l00p. The comma after M is to cast the args as a tuple to prevent it iterating over the thread M
@@ -2539,7 +2650,7 @@ def analyzeProtocol():
     import hashlib as _hashlib
     import os as _os
     try:
-        client_ip = request.remote_addr or 'unknown'
+        client_ip = _client_ip()
         if not _gemini_rate_ok(client_ip):
             return jsonify({'error': 'Demasiadas peticiones. Espera un minuto.'}), 429
 
@@ -2574,11 +2685,12 @@ def analyzeProtocol():
         )
 
         text = _gemini_request(prompt)
-        _gemini_cache[code_hash] = text
+        _cache_put(_gemini_cache, code_hash, text)
         return jsonify({'analysis': text, 'code': code})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(str(datetime.now()) + ' [NEXUS] Error en analyzeProtocol: ' + str(e))
+        return jsonify({'error': 'No se pudo analizar el protocolo'}), 500
 
 
 @application.route('/generateProtocol/', methods=['POST'])
@@ -2590,7 +2702,7 @@ def generateProtocol():
     Body JSON: { "prompt": "..." }
     """
     try:
-        client_ip = request.remote_addr or 'unknown'
+        client_ip = _client_ip()
         if not _gemini_rate_ok(client_ip):
             return jsonify({'error': 'Demasiadas peticiones. Espera un minuto.'}), 429
 
@@ -2603,48 +2715,7 @@ def generateProtocol():
         if prompt_hash in _gemini_ast_cache:
             return jsonify({'ast': _gemini_ast_cache[prompt_hash], 'cached': True})
 
-        system_prompt = (
-            'Eres un copiloto experto en automatización de biorreactores Chi.Bio.\n'
-            'Traduce las instrucciones en lenguaje natural a un array de objetos JSON que representa el AST del protocolo.\n'
-            'DEBES responder ÚNICAMENTE con un array JSON válido. Nada de texto extra, ni markdown.\n\n'
-            'Bloques permitidos y rangos exactos:\n'
-            '- "init_temp": {"type":"init_temp","temp":Float} — temp en [25.0, 50.0] °C. SIEMPRE primer bloque.\n'
-            '- "init_od": {"type":"init_od","od":Float} — od en [0.01, 2.0]. SIEMPRE segundo bloque.\n'
-            '- "init_stir": {"type":"init_stir","speed":Float} — speed en [0.0, 1.0] (0.5 es estándar). SIEMPRE tercer bloque.\n'
-            '- "thermostat": {"type":"thermostat","temp":Float} — temp en [25.0, 50.0]\n'
-            '- "ramp_temp": {"type":"ramp_temp","temp_start":Float,"temp_end":Float,"duration":Int} — duration en ciclos >= 1 (30 ciclos ≈ 1 min). NUNCA duration=0.\n'
-            '- "led": {"type":"led","led":String,"power":Float,"mode":String,"duration":Float,"unit":String}\n'
-            '  led DEBE ser uno de: "LEDB" (457nm azul), "LEDC" (500nm), "LEDD" (523nm verde), "LEDF" (623nm), "LEDG" (blanco 6500K), "LEDH" (600nm), "LEDI" (550nm). NUNCA "blue", "red", "green" u otros.\n'
-            '  power en [0.0, 1.0] — 0.1=10%, 0.5=50%, 1.0=100%. Convierte siempre porcentajes: 20%→0.2, 50%→0.5. NUNCA valores > 1.0.\n'
-            '  mode en ["pulse", "on", "off"]. Con tiempo SIEMPRE mode="pulse". unit en ["sec" (max 15s), "min"].\n'
-            '- "uv": {"type":"uv","power":Float,"mode":String,"duration":Float,"unit":String} — mismos rangos que led.\n'
-            '- "pump": {"type":"pump","pump":String,"duration":Float} — pump en ["Pump1","Pump2","Pump3","Pump4"] (NUNCA "1","2","3","4"). duration en segundos (max 20). Las bombas son on/off; el caudal se calibra aparte, NO uses "power".\n'
-            '- "turbidostat": {"type":"turbidostat","state":"on"}\n'
-            '- "chemostat": {"type":"chemostat","state":"on","p1":Float,"p2":Float} — p1 y p2 en [0.0, 1.0], p2 > p1.\n'
-            '- "zigzag": {"type":"zigzag","state":"on","zig":Float} — zig en [0.01, 0.5]\n'
-            '- "wait": {"type":"wait","duration":Float,"unit":String} — unit en ["sec" (max 15), "min", "gen"]\n'
-            '- "loop": {"type":"loop","count":Int,"children":[...bloques...]} — children NUNCA vacío. count >= 2.\n'
-            '  Ejemplo de loop correcto: {"type":"loop","count":5,"children":[{"type":"led","led":"LEDB","power":0.5,"mode":"pulse","duration":1,"unit":"min"},{"type":"wait","duration":2,"unit":"min"}]}\n'
-            '- "trigger": {"type":"trigger","tvar":String,"op":String,"val":Float,"behavior":String,"children":[...bloques...]}\n'
-            '  tvar DEBE ser exactamente uno de (respeta mayúsculas): "OD", "GrowthRate", "Temp", "FP1", "FP2", "FP3", "Generations". NUNCA "pH", "od" u otras variables no listadas.\n'
-            '  op DEBE ser exactamente uno de: ">", "<", ">=", "<=", "==". NUNCA "gt", "lt", "ge", "le", "eq".\n'
-            '  behavior en ["wait", "if"].\n'
-            '- "log": {"type":"log","msg":String}\n\n'
-            'REGLAS:\n'
-            '1. SIEMPRE incluir init_temp, init_od, init_stir como primeros 3 bloques. Son obligatorios.\n'
-            '2. Solo UN modo de control (turbidostat, chemostat o zigzag). NUNCA dos a la vez.\n'
-            '3. init_temp, init_od, init_stir solo pueden aparecer UNA vez cada uno.\n'
-            '4. LEDs con tiempo: mode="pulse". NO uses mode="on" con tiempo.\n'
-            '5. NO generes la propiedad "id".\n'
-            '6. En "loop": children SIEMPRE contiene al menos un bloque. NUNCA "children":[].\n'
-            '7. Convierte porcentajes a decimales: 20%→0.2, 50%→0.5, 100%→1.0.\n'
-            '8. Agitación (speed) y potencias (power) siempre en [0.0, 1.0]. Nunca RPM ni valores absolutos.\n'
-            '9. En un trigger con behavior="wait": los children son acciones que se ejecutan cuando la condición YA se cumplió. NUNCA incluyas un bloque "wait" dentro de children de un trigger behavior="wait" — esa espera ya la gestiona el propio trigger.\n'
-            '10. Antes de generar un "loop", cuenta explícitamente los bloques que el usuario describió dentro de él. children debe contener EXACTAMENTE esos bloques, en orden, sin omitir ninguno.\n'
-            '11. NO generes la propiedad "power" en bloques "pump". Las bombas son on/off.\n'
-            '12. Convierte horas a minutos para el campo duration: 1 hora=60 min, 2 horas=120 min, 0.5 horas=30 min. Usa siempre unit="min".\n'
-            '13. init_temp, init_od, init_stir SOLO pueden aparecer UNA VEZ en todo el array. NUNCA los repitas ni los generes con valores distintos en otro punto del array.'
-        )
+        system_prompt = GENERATE_PROTOCOL_SYSTEM  # Q8: prompt canónico compartido (prompts.py)
 
         text = _gemini_request(prompt_text, system_prompt, use_json_mode=True)
         text_clean = text.strip()
@@ -2652,11 +2723,12 @@ def generateProtocol():
             text_clean = text_clean.split('\n', 1)[-1].rsplit('```', 1)[0].strip()
         parsed = json.loads(text_clean)
         ast_json = json.dumps(parsed, ensure_ascii=False)
-        _gemini_ast_cache[prompt_hash] = ast_json
+        _cache_put(_gemini_ast_cache, prompt_hash, ast_json)
         return jsonify({'ast': ast_json})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(str(datetime.now()) + ' [NEXUS] Error en generateProtocol: ' + str(e))
+        return jsonify({'error': 'No se pudo generar el protocolo'}), 500
 
 
 @application.route('/injectProtocol/', methods=['POST'])
@@ -2676,22 +2748,16 @@ def injectProtocol():
 
         # El compilador FSM genera un snippet que empieza con `elif` indentado.
         # _nexus_exec transforma eso antes de ejecutar; replicamos la misma
-        # transformación aquí para que compile() valide el código real.
-        _lines = code.split('\n')
-        _fixed = []
-        _first_elif = False
-        for _l in _lines:
-            if not _first_elif and _l.strip().startswith('elif (program'):
-                _l = _l.replace('elif (program', 'if (program', 1)
-                _first_elif = True
-            if _l.startswith('    '):
-                _l = _l[4:]
-            _fixed.append(_l)
-        _executable = '\n'.join(_fixed)
+        # transformación aquí para validar el código real.
+        _executable = _fsm_dedent(code)
         try:
-            compile(_executable, '<protocol>', 'exec')
+            _tree = ast.parse(_executable)
         except SyntaxError as syn:
             return jsonify({'error': 'Sintaxis inválida: ' + str(syn)}), 400
+        try:
+            _validate_protocol_ast(_tree)
+        except ValueError as v:
+            return jsonify({'error': 'Protocolo no permitido: ' + str(v)}), 400
 
         proto_dir  = os.path.dirname(os.path.abspath(__file__))
         proto_path = os.path.join(proto_dir, 'protocolo.py')
@@ -2709,7 +2775,8 @@ def injectProtocol():
         return jsonify({'ok': True, 'path': proto_path})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print(str(datetime.now()) + ' [NEXUS] Error en injectProtocol: ' + str(e))
+        return jsonify({'error': 'No se pudo guardar el protocolo'}), 500
 
 
 initialiseAll()

@@ -113,6 +113,12 @@ input,select{font-family:var(--f-ui);}
 .col-l{border-right:1px solid var(--bd);padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
 .col-c{padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
 .col-r{border-left:1px solid var(--bd);padding:9px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;}
+/* Modo solo gráficas: oculta las columnas laterales, col-c a ancho completo */
+#page.charts-only{grid-template-columns:1fr;}
+#page.charts-only .col-l,#page.charts-only .col-r{display:none;}
+/* dentro de col-c oculta el bloque Custom/FSM + Fluorescencia/Terminal/Protocolo: solo gráficas */
+#page.charts-only #tab-advanced{display:none;}
+#chartsOnlyBtn.active{color:var(--gr);border-color:var(--gr);}
 
 /* Tab Containers para gestionar secciones modulares (solo visibles en movil o si se configuran) */
 .tab-container{display:flex;flex-direction:column;gap:9px;}

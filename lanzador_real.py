@@ -112,10 +112,13 @@ def _tcp_check(host, port, timeout=1.5):
         return False
 
 
-def _http_check(url, timeout=3):
+def _http_check(url, timeout=3, access_headers=None):
     # Cloudflare WAF bloquea el User-Agent default de urllib (Python-urllib/x.y)
     # con 403, aunque el sitio responda 200 normal a cualquier navegador/curl.
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    headers = {"User-Agent": "Mozilla/5.0"}
+    if access_headers:
+        headers.update(access_headers)
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return resp.status < 400
@@ -1001,7 +1004,10 @@ class PanelControl(ctk.CTk):
         red_ok = _usb_ip_check(usb_idx)
         bbb_ok = _tcp_check(LOCAL_HOST, LOCAL_PORT)
         camara_ok = _http_check(CAMERA_LOCAL_HEALTH)
-        tunel_ok = _http_check(self.tunnel_url) if self._use_tunnel else None
+        tunel_ok = (
+            _http_check(self.tunnel_url, access_headers=self._access_headers)
+            if self._use_tunnel else None
+        )
         cam_estado = _service_status("ChibioCamera")
         tun_estado = _service_status("ChibioTunnel") if self._use_tunnel else None
 
@@ -1199,7 +1205,7 @@ class PanelControl(ctk.CTk):
 
         tunel_ok = None
         if self._use_tunnel:
-            tunel_ok = _http_check(self.tunnel_url)
+            tunel_ok = _http_check(self.tunnel_url, access_headers=self._access_headers)
             if tunel_ok:
                 lineas.append("4. Túnel Cloudflare: OK")
             else:
@@ -1490,7 +1496,10 @@ class PanelControl(ctk.CTk):
     def _leer_config_pc(self, proyecto):
         """Lee config_pc.py (si existe) y devuelve dict con TUNNEL_NAME/CHIBIO_HOSTNAME/CAMERA_HOSTNAME."""
         path = os.path.join(proyecto, "config_pc.py")
-        valores = {"TUNNEL_NAME": "", "CHIBIO_HOSTNAME": "", "CAMERA_HOSTNAME": ""}
+        valores = {
+            "TUNNEL_NAME": "", "CHIBIO_HOSTNAME": "", "CAMERA_HOSTNAME": "",
+            "CF_ACCESS_CLIENT_ID": "", "CF_ACCESS_CLIENT_SECRET": "",
+        }
         if os.path.isfile(path):
             try:
                 with open(path, encoding="utf-8") as f:
@@ -1511,6 +1520,12 @@ class PanelControl(ctk.CTk):
         )
         self.camera_tunnel_health = (
             f"https://{cfg['CAMERA_HOSTNAME']}/health" if cfg.get("CAMERA_HOSTNAME") else CAMERA_TUNNEL_HEALTH
+        )
+        client_id = cfg.get("CF_ACCESS_CLIENT_ID")
+        client_secret = cfg.get("CF_ACCESS_CLIENT_SECRET")
+        self._access_headers = (
+            {"CF-Access-Client-Id": client_id, "CF-Access-Client-Secret": client_secret}
+            if client_id and client_secret else None
         )
 
     def _chequear_gemini_key(self):

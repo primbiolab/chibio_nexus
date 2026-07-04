@@ -12,17 +12,19 @@ Abre en el navegador: http://localhost:5000
 """
 
 import os
+import ast
 import copy
 import math
 import random
 import time
 from datetime import datetime
 from flask import Flask, render_template, jsonify, request
+from prompts import GENERATE_PROTOCOL_SYSTEM
 
 # ── Gemini (opcional — requiere config.py con GEMINI_API_KEY) ────
 try:
     from config import GEMINI_API_KEY
-    GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=' + GEMINI_API_KEY
+    GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent'
     _GEMINI_OK = True
 except ImportError:
     _GEMINI_OK = False
@@ -41,7 +43,7 @@ def _gemini_request(prompt, system_prompt=None, use_json_mode=False):
         'contents': contents,
         'generationConfig': gen_config
     }).encode('utf-8')
-    req = _req.Request(GEMINI_URL, data=body, headers={'Content-Type': 'application/json'}, method='POST')
+    req = _req.Request(GEMINI_URL, data=body, headers={'Content-Type': 'application/json', 'x-goog-api-key': GEMINI_API_KEY}, method='POST')
     with _req.urlopen(req, timeout=30) as resp:
         data = _json.loads(resp.read().decode('utf-8'))
     return data['candidates'][0]['content']['parts'][0]['text']
@@ -302,7 +304,72 @@ def _build_sysdata(device_id: str) -> dict:
     return _merge_mut(result, device_id)
 
 
+# ── Validador AST del FSM inyectado (espejo de app.py, ver HF-01) ───
+def _fsm_dedent(code):
+    lines = code.split('\n')
+    fixed = []
+    first_elif_done = False
+    for line in lines:
+        if not first_elif_done and line.strip().startswith('elif (program'):
+            line = line.replace('elif (program', 'if (program', 1)
+            first_elif_done = True
+        if line.startswith('    '):
+            line = line[4:]
+        fixed.append(line)
+    return '\n'.join(fixed)
+
+_ALLOWED_AST_NODES = (
+    ast.Module, ast.If, ast.Compare, ast.BoolOp,
+    ast.Assign, ast.AugAssign,
+    ast.Call, ast.Attribute, ast.Subscript,
+    ast.Constant, ast.BinOp, ast.UnaryOp,
+    ast.JoinedStr, ast.FormattedValue,
+    ast.Pass, ast.Expr, ast.Tuple, ast.List, ast.Dict, ast.Name, ast.Load, ast.Store,
+    ast.Index, ast.Slice,
+    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow, ast.USub, ast.UAdd,
+    ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.And, ast.Or, ast.Not,
+    ast.keyword,
+)
+_ALLOWED_CALLS = {
+    'SetOutputOn', 'SetOutputTarget', 'MeasureOD', 'MeasureTemp', 'MeasureFP',
+    'addTerminal', 'RegulateOD',
+    'range', 'len', 'int', 'float', 'str', 'bool', 'min', 'max', 'round', 'abs',
+}
+_ALLOWED_ATTR_CALLS = {'sleep', 'get'}
+_DENIED_NAMES = {
+    'eval', 'exec', 'compile', 'open', '__import__', 'getattr', 'setattr',
+    'delattr', 'vars', 'globals', 'locals', 'input', 'breakpoint',
+    'memoryview', 'object', 'type', 'help', 'classmethod', 'staticmethod',
+    'super', 'property',
+}
+
+def _validate_protocol_ast(tree):
+    for node in ast.walk(tree):
+        if not isinstance(node, _ALLOWED_AST_NODES):
+            raise ValueError('Construcción no permitida: ' + type(node).__name__)
+        if isinstance(node, ast.Attribute) and node.attr.startswith('_'):
+            raise ValueError('Acceso a atributo no permitido: ' + node.attr)
+        if isinstance(node, ast.Name) and node.id in _DENIED_NAMES:
+            raise ValueError('Nombre no permitido: ' + node.id)
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                if func.id not in _ALLOWED_CALLS:
+                    raise ValueError('Llamada no permitida: ' + func.id)
+            elif isinstance(func, ast.Attribute):
+                if func.attr not in _ALLOWED_ATTR_CALLS:
+                    raise ValueError('Llamada no permitida: .' + func.attr)
+            else:
+                raise ValueError('Forma de llamada no permitida')
+
+
 # ── Rutas Flask ──────────────────────────────────────────────────
+
+@app.before_request
+def block_csrf():
+    if request.method in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return jsonify({'error': 'CSRF: missing X-Requested-With header'}), 403
 
 @app.route('/mobile-blocked')
 def mobile_blocked():
@@ -487,49 +554,7 @@ def generateProtocol():
         prompt_text = request.get_json().get('prompt', '').strip()
         if not prompt_text:
             return jsonify({'error': 'No se recibió prompt'}), 400
-        system_prompt = (
-            'Eres un copiloto experto en automatización de biorreactores Chi.Bio.\n'
-            'Traduce las instrucciones en lenguaje natural a un array de objetos JSON que representa el AST del protocolo.\n'
-            'DEBES responder ÚNICAMENTE con un array JSON válido. Nada de texto extra, ni markdown.\n\n'
-            'Bloques permitidos y rangos exactos:\n'
-            '- "init_temp": {"type":"init_temp","temp":Float} — temp en [25.0, 50.0] °C. SIEMPRE primer bloque.\n'
-            '- "init_od": {"type":"init_od","od":Float} — od en [0.01, 2.0]. SIEMPRE segundo bloque.\n'
-            '- "init_stir": {"type":"init_stir","speed":Float} — speed en [0.0, 1.0] (0.5 es estándar). SIEMPRE tercer bloque.\n'
-            '- "thermostat": {"type":"thermostat","temp":Float} — temp en [25.0, 50.0]\n'
-            '- "ramp_temp": {"type":"ramp_temp","temp_start":Float,"temp_end":Float,"duration":Int} — duration en ciclos >= 1 (1 ciclo ≈ 1 min). NUNCA duration=0. Para "1 hora" usa duration=60, para "30 minutos" usa duration=30.\n'
-            '- "led": {"type":"led","led":String,"power":Float,"mode":String,"duration":Float,"unit":String}\n'
-            '  led DEBE ser uno de: "LEDB" (457nm azul), "LEDC" (500nm), "LEDD" (523nm verde), "LEDF" (623nm), "LEDG" (blanco 6500K), "LEDH" (600nm), "LEDI" (550nm). NUNCA "blue", "red", "green" u otros.\n'
-            '  power en [0.0, 1.0] — 0.1=10%, 0.5=50%, 1.0=100%. Convierte siempre porcentajes: 20%→0.2, 50%→0.5. NUNCA valores > 1.0.\n'
-            '  mode en ["pulse", "on", "off"]. Con tiempo SIEMPRE mode="pulse". unit en ["sec" (max 15s), "min"].\n'
-            '- "uv": {"type":"uv","power":Float,"mode":String,"duration":Float,"unit":String} — mismos rangos que led.\n'
-            '- "pump": {"type":"pump","pump":String,"duration":Float} — pump en ["Pump1","Pump2","Pump3","Pump4"] (NUNCA "1","2","3","4"). duration en segundos (max 20). Las bombas son on/off; el caudal se calibra aparte, NO uses "power".\n'
-            '- "turbidostat": {"type":"turbidostat","state":"on"}\n'
-            '- "chemostat": {"type":"chemostat","state":"on","p1":Float,"p2":Float} — p1 y p2 en [0.0, 1.0], p2 > p1.\n'
-            '- "zigzag": {"type":"zigzag","state":"on","zig":Float} — zig en [0.01, 0.5]\n'
-            '- "wait": {"type":"wait","duration":Float,"unit":String} — unit en ["sec" (max 15), "min", "gen"]\n'
-            '- "loop": {"type":"loop","count":Int,"children":[...bloques...]} — children NUNCA vacío. count >= 2. Los bloques que se repiten van DENTRO de children, no fuera.\n'
-            '  Ejemplo de loop correcto: {"type":"loop","count":5,"children":[{"type":"led","led":"LEDB","power":0.5,"mode":"pulse","duration":1,"unit":"min"},{"type":"wait","duration":2,"unit":"min"}]}\n'
-            '- "trigger": {"type":"trigger","tvar":String,"op":String,"val":Float,"behavior":String,"children":[...bloques...]}\n'
-            '  tvar DEBE ser exactamente uno de (respeta mayúsculas): "OD", "GrowthRate", "Temp", "FP1", "FP2", "FP3", "Generations". NUNCA "pH", "od" u otras variables no listadas.\n'
-            '  op DEBE ser exactamente uno de: ">", "<", ">=", "<=", "==". NUNCA "gt", "lt", "ge", "le", "eq".\n'
-            '  behavior en ["wait", "if"]. Las acciones condicionales van DENTRO de children.\n'
-            '- "log": {"type":"log","msg":String}\n\n'
-            'REGLAS:\n'
-            '1. SIEMPRE incluir init_temp, init_od, init_stir como primeros 3 bloques. Son obligatorios.\n'
-            '2. Solo UN modo de control (turbidostat, chemostat o zigzag). NUNCA dos a la vez.\n'
-            '3. init_temp, init_od, init_stir solo pueden aparecer UNA vez cada uno.\n'
-            '4. LEDs con tiempo: mode="pulse". NO uses mode="on" con tiempo.\n'
-            '5. NO generes la propiedad "id".\n'
-            '6. En "loop": children SIEMPRE contiene al menos un bloque. NUNCA "children":[]. NO pierdas bloques que el usuario describió dentro del loop.\n'
-            '7. En "trigger": children SIEMPRE contiene los bloques de acción descritos. NO pierdas LEDs, pumps o logs que el usuario asocie al disparo.\n'
-            '8. Convierte porcentajes a decimales: 20%→0.2, 50%→0.5, 60%→0.6, 100%→1.0.\n'
-            '9. Agitación (speed) y potencias (power) siempre en [0.0, 1.0]. Nunca RPM ni valores absolutos.\n'
-            '10. Preserva TODOS los pasos del usuario en orden. No omitas esperas, logs, ni acciones intermedias.\n'
-            '11. En un trigger con behavior="wait": los children son acciones que se ejecutan cuando la condición YA se cumplió. NUNCA incluyas un bloque "wait" dentro de children de un trigger behavior="wait" — esa espera ya la gestiona el propio trigger.\n'
-            '12. Antes de generar un "loop", cuenta explícitamente los bloques que el usuario describió dentro de él. children debe contener EXACTAMENTE esos bloques, en orden, sin omitir ninguno.\n'
-            '13. Convierte horas a minutos para el campo duration: 1 hora=60 min, 2 horas=120 min, 0.5 horas=30 min. Usa siempre unit="min".\n'
-            '14. init_temp, init_od, init_stir SOLO pueden aparecer UNA VEZ en todo el array. NUNCA los repitas ni los generes con valores distintos en otro punto del array.'
-        )
+        system_prompt = GENERATE_PROTOCOL_SYSTEM  # Q8: prompt canónico compartido (prompts.py)
         import json as _json
         text = _gemini_request(prompt_text, system_prompt, use_json_mode=True)
         text_clean = text.strip()
@@ -547,6 +572,16 @@ def injectProtocol():
     code = (data or {}).get('code', '').strip()
     if not code:
         return jsonify({'error': 'No se recibió código'}), 400
+
+    executable = _fsm_dedent(code)
+    try:
+        tree = ast.parse(executable)
+    except SyntaxError as syn:
+        return jsonify({'error': 'Sintaxis inválida: ' + str(syn)}), 400
+    try:
+        _validate_protocol_ast(tree)
+    except ValueError as v:
+        return jsonify({'error': 'Protocolo no permitido: ' + str(v)}), 400
 
     _cloud['status']        = 'ok'
     _cloud['inject_count'] += 1

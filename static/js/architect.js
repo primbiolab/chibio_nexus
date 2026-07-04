@@ -755,7 +755,25 @@ function validate(nodes,errs,warns,M){
 
 // ── FSM COMPILER ENGINE ─────────────────────────────────
 function compileFSM(nodes, M, progName) {
-    let states = {}; let sc = 1; 
+    // HF-14: normalizar tipos ANTES de generar el Python. Todos estos campos se
+    // interpolan en el código generado; sin esto, un AST manipulado (cliente
+    // atacante o JSON de Gemini malformado) podría inyectar Python arbitrario.
+    // El servidor revalida vía AST (HF-01); esto cierra además el camino cliente.
+    const _NUM_FIELDS = ['duration','power','temp','temp_start','temp_end','val','od','speed','p1','p2','zig'];
+    const _LEDS  = ['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI','LEDV'];
+    const _PUMPS = ['Pump1','Pump2','Pump3','Pump4'];
+    function _num(v){ v = Number(v); return isFinite(v) ? v : 0; }
+    (function _sanitize(list){
+        (list||[]).forEach(function(n){
+            _NUM_FIELDS.forEach(function(k){ if(n[k]!==undefined) n[k]=_num(n[k]); });
+            if(n.count!==undefined) n.count=Math.max(0, Math.round(_num(n.count)));
+            if(n.led!==undefined  && _LEDS.indexOf(n.led)===-1)   n.led='LEDB';
+            if(n.pump!==undefined && _PUMPS.indexOf(n.pump)===-1)  n.pump='Pump1';
+            if(n.children) _sanitize(n.children);
+        });
+    })(nodes);
+
+    let states = {}; let sc = 1;
     function allocateState() { return ++sc; }
     function write(state, lines) { if(!states[state]) states[state]=[]; if(Array.isArray(lines)) states[state].push(...lines); else states[state].push(lines); }
 
@@ -979,7 +997,7 @@ async function sendToReactor() {
         addMsg("info", "🔗", "Enviando protocolo al Biorreactor...");
         const resp = await fetch('/injectProtocol/', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: JSON.stringify({ code: cleanCode, M: M })
         });
         const data = await resp.json();
@@ -1162,7 +1180,7 @@ async function triggerAIGeneration() {
     try {
         const response = await fetch('/generateProtocol/', {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
             body: JSON.stringify({ prompt: promptText }),
             signal: ctrl.signal
         });

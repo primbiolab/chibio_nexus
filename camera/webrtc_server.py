@@ -74,6 +74,7 @@ FRAME_WIDTH    = 1280    # resolución ancho
 FRAME_HEIGHT   = 720     # resolución alto (16:9 nativo, soportado por casi todas las webcams a 60fps)
 BUFFER_SIZE    = 1       # ring buffer size: 1 = siempre el frame más fresco
 MAX_PEERS      = 8       # máximo de clientes WebRTC simultáneos
+MAX_PEERS_PER_IP = 2     # máximo de peers por IP (evita que un cliente monopolice)
 CAPTURE_MAX_FAILURES = 50  # reintentos antes de reinicializar la cámara
 
 # Orígenes permitidos para CORS. El polling /health del Nexus es cross-origin
@@ -278,6 +279,7 @@ camera = CameraCapture(
 
 # Registro de PeerConnections activos
 peer_connections: dict[str, RTCPeerConnection] = {}
+peer_ips: dict[str, str] = {}   # client_id -> IP real, para el límite por-IP
 
 
 # ─────────────────────────────────────────────
@@ -304,6 +306,7 @@ async def shutdown():
     for pc in list(peer_connections.values()):
         await pc.close()
     peer_connections.clear()
+    peer_ips.clear()
 
 
 # ─────────────────────────────────────────────
@@ -313,12 +316,31 @@ async def shutdown():
 
 @app.websocket("/ws/signal")
 async def signaling(ws: WebSocket):
+    # Chequeo de origin: CORSMiddleware NO cubre el handshake WebSocket.
+    origin = ws.headers.get("origin")
+    if origin is not None and origin not in ALLOWED_ORIGINS:
+        log.warning(f"WS rechazado: origin no permitido {origin!r}")
+        await ws.close(code=1008)
+        return
+
+    # IP real del cliente (detrás de Cloudflare, ws.client.host es 127.0.0.1).
+    client_ip = (ws.headers.get("cf-connecting-ip")
+                 or (ws.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+                 or (ws.client.host if ws.client else "unknown"))
+
     await ws.accept()
     client_id = str(uuid.uuid4())[:8]
 
+    # Límites global y por-IP. Check + inserción sin await entre medio → atómico
+    # bajo el loop de asyncio (un solo hilo), sin race con otras conexiones.
     if len(peer_connections) >= MAX_PEERS:
-        log.warning(f"[{client_id}] Rechazado: límite de {MAX_PEERS} peers alcanzado")
+        log.warning(f"[{client_id}] Rechazado: límite global de {MAX_PEERS} peers alcanzado")
         await ws.send_json({"type": "error", "msg": "Máximo de conexiones simultáneas alcanzado"})
+        await ws.close()
+        return
+    if sum(1 for ip in peer_ips.values() if ip == client_ip) >= MAX_PEERS_PER_IP:
+        log.warning(f"[{client_id}] Rechazado: límite por-IP ({MAX_PEERS_PER_IP}) para {client_ip}")
+        await ws.send_json({"type": "error", "msg": "Máximo de conexiones para tu dirección alcanzado"})
         await ws.close()
         return
 
@@ -327,6 +349,7 @@ async def signaling(ws: WebSocket):
     config = RTCConfiguration(iceServers=ICE_SERVERS)
     pc = RTCPeerConnection(configuration=config)
     peer_connections[client_id] = pc
+    peer_ips[client_id] = client_ip
 
     # Agregar track de video al peer connection
     video_track = CameraVideoTrack(camera)
@@ -339,6 +362,7 @@ async def signaling(ws: WebSocket):
         if state in ("failed", "closed", "disconnected"):
             await pc.close()
             peer_connections.pop(client_id, None)
+            peer_ips.pop(client_id, None)
 
     @pc.on("iceconnectionstatechange")
     async def on_ice_change():
@@ -401,6 +425,7 @@ async def signaling(ws: WebSocket):
     finally:
         await pc.close()
         peer_connections.pop(client_id, None)
+        peer_ips.pop(client_id, None)
         log.info(f"[{client_id}] Limpieza completada")
 
 
