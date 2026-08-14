@@ -151,5 +151,5 @@ chibio_nexus/
 
 ## Autor
 
-Desarrollado por **Juan David Romero Montes**.  
+Desarrollado por **Juan David Romero Montes** y **Francisco Javier Burgos Flórez**.  
 Basado en el hardware open-source [Chi.Bio](https://chi.bio/) (Harrison & Dunlop, 2020).
