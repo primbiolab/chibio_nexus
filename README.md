@@ -149,7 +149,15 @@ chibio_nexus/
 
 ---
 
-## Autor
+## 📜 Créditos y Contexto
 
-Desarrollado por **Juan David Romero Montes** y **Francisco Javier Burgos Flórez**.  
-Basado en el hardware open-source [Chi.Bio](https://chi.bio/) (Harrison & Dunlop, 2020).
+Desarrollado por **Juan David Romero Montes** y **Francisco Javier Burgos Flórez** en la Universidad Nacional de Colombia, Sede La Paz, en el marco de las actividades académicas de sus autores.
+
+Se hace uso del hardware open-source [Chi.Bio](https://chi.bio/) (Harrison & Dunlop, 2020).
+
+---
+## Afiliación institucional
+
+Escuela de Pregrado, Dirección Académica, Vicerrectoría de Sede, Universidad Nacional de Colombia, Sede La Paz, Cesar, Colombia.
+
+
