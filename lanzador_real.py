@@ -121,6 +121,9 @@ def _http_check(url, timeout=3, access_headers=None):
     req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
+            # Sin token valido, Access redirige a su login y este devuelve 200: falso OK.
+            if "cloudflareaccess.com" in resp.url:
+                return False
             return resp.status < 400
     except Exception:
         return False
@@ -1767,25 +1770,80 @@ class PanelControl(ctk.CTk):
         form.pack(fill="x", **pad)
 
         campos = {}
-        etiquetas = [
-            ("TUNNEL_NAME", "Nombre del túnel:"),
-            ("CHIBIO_HOSTNAME", "Dominio Chi.Bio Nexus:"),
-            ("CAMERA_HOSTNAME", "Dominio de la cámara:"),
-        ]
-        for i, (clave, etiqueta) in enumerate(etiquetas):
-            ctk.CTkLabel(form, text=etiqueta, font=_font(size=12),
+        requeridos = ("TUNNEL_NAME", "CHIBIO_HOSTNAME", "CAMERA_HOSTNAME")
+
+        def fila(parent, i, clave, etiqueta):
+            ctk.CTkLabel(parent, text=etiqueta, font=_font(size=12),
                          text_color=COLOR["tx2"]).grid(row=i, column=0, sticky="w", pady=6)
-            entry = ctk.CTkEntry(form, font=_font(F_MONO, 12), width=280, corner_radius=9,
-                                  fg_color=COLOR["s2"], text_color=COLOR["tx"], border_width=0)
+            entry = ctk.CTkEntry(parent, font=_font(F_MONO, 12), width=280, corner_radius=9,
+                                  fg_color=COLOR["s2"], text_color=COLOR["tx"], border_width=0,
+                                  show="*" if clave == "CF_ACCESS_CLIENT_SECRET" else "")
             entry.insert(0, actuales.get(clave, ""))
             entry.grid(row=i, column=1, padx=9, pady=5)
             campos[clave] = entry
+
+        fila(form, 0, "TUNNEL_NAME", "Nombre del túnel:")
+        fila(form, 1, "CHIBIO_HOSTNAME", "Dominio Chi.Bio Nexus:")
+        fila(form, 2, "CAMERA_HOSTNAME", "Dominio de la cámara:")
+
+        # Seccion plegable (cerrada por defecto) para el Service Token de Cloudflare Access.
+        acceso_hdr = ctk.CTkFrame(dlg, fg_color="transparent", cursor="hand2")
+        acceso_hdr.pack(fill="x", padx=16, pady=(2, 0))
+        chevron = ctk.CTkLabel(acceso_hdr, text="▸", width=16, font=_font(size=14),
+                               text_color=COLOR["tx3"])
+        chevron.pack(side="left")
+        titulo = ctk.CTkLabel(acceso_hdr, text="Configurar tokens de acceso (Cloudflare)",
+                              font=_font(size=12), text_color=COLOR["tx2"])
+        titulo.pack(side="left", padx=(4, 0))
+
+        acceso_cuerpo = ctk.CTkFrame(dlg, fg_color="transparent", corner_radius=0, height=0)
+        acceso_cuerpo.pack(fill="x", padx=16)
+        acceso_cuerpo.pack_propagate(False)
+        acceso = ctk.CTkFrame(acceso_cuerpo, fg_color="transparent")
+        acceso.pack(fill="x", anchor="n")
+        for contenedor in (form, acceso):
+            contenedor.grid_columnconfigure(0, minsize=150)  # alinea las entradas de ambos bloques
+        ctk.CTkLabel(acceso, text="Solo si tu dominio está protegido con Cloudflare Access.",
+                     font=_font(size=11), text_color=COLOR["tx3"]).grid(
+                         row=0, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        fila(acceso, 1, "CF_ACCESS_CLIENT_ID", "Client ID:")
+        fila(acceso, 2, "CF_ACCESS_CLIENT_SECRET", "Client Secret:")
+
+        anim = {"abierto": False, "job": None, "h": 0}
+
+        def animar(destino):
+            if anim["job"]:
+                dlg.after_cancel(anim["job"])
+            inicio, pasos = anim["h"], 12
+
+            def paso(n=1):
+                if not dlg.winfo_exists():
+                    return
+                e = 1 - (1 - n / pasos) ** 3  # ease-out cubico
+                anim["h"] = round(inicio + (destino - inicio) * e)
+                acceso_cuerpo.configure(height=anim["h"])
+                anim["job"] = dlg.after(16, paso, n + 1) if n < pasos else None
+            paso()
+
+        def alternar(_e=None):
+            anim["abierto"] = not anim["abierto"]
+            chevron.configure(text="▾" if anim["abierto"] else "▸")
+            dlg.update_idletasks()
+            animar(acceso.winfo_reqheight() if anim["abierto"] else 0)
+
+        def hover(activo):
+            titulo.configure(text_color=COLOR["tx"] if activo else COLOR["tx2"])
+
+        for w in (acceso_hdr, chevron, titulo):
+            w.bind("<Button-1>", alternar)
+            w.bind("<Enter>", lambda _e: hover(True))
+            w.bind("<Leave>", lambda _e: hover(False))
 
         def guardar():
             valores = {clave: campos[clave].get().strip() for clave in campos}
             for k in ("CHIBIO_HOSTNAME", "CAMERA_HOSTNAME"):
                 valores[k] = valores[k].removeprefix("https://").removeprefix("http://").rstrip("/")
-            if not all(valores.values()):
+            if not all(valores[k] for k in requeridos):
                 self._msg_error("Faltan datos", "Completa los 3 campos (o cancela y elige 'No' al tunel).")
                 return
             contenido = (
@@ -1794,6 +1852,9 @@ class PanelControl(ctk.CTk):
                 f'CHIBIO_HOSTNAME = "{valores["CHIBIO_HOSTNAME"]}"\n'
                 f'CAMERA_HOSTNAME = "{valores["CAMERA_HOSTNAME"]}"\n'
             )
+            for k in ("CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"):
+                if valores[k]:
+                    contenido += f'{k} = "{valores[k]}"\n'
             with open(os.path.join(proyecto, "config_pc.py"), "w", encoding="utf-8") as f:
                 f.write(contenido)
             resultado["ok"] = True
@@ -1940,7 +2001,7 @@ class PanelControl(ctk.CTk):
 
     def _abrir_navegador(self):
         # Túnel primero: si está configurado y el origen responde, es la URL pública.
-        if self._tunnel_configurado and _http_check(self.tunnel_url):
+        if self._tunnel_configurado and _http_check(self.tunnel_url, access_headers=self._access_headers):
             webbrowser.open(self.tunnel_url)
             self._set_log(f"Abriendo {self.tunnel_url} (túnel disponible).")
         elif _tcp_check(LOCAL_HOST, LOCAL_PORT):
