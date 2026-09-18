@@ -43,7 +43,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from PIL import Image, ImageTk
 
-LOCAL_HOST = "127.0.0.1"  # TEMP: mock — cambiar a "192.168.7.2" para BBB real
+LOCAL_HOST = "192.168.7.2"  # BBB real
 LOCAL_PORT = 5000
 LOCAL_URL = f"http://{LOCAL_HOST}:{LOCAL_PORT}"
 
