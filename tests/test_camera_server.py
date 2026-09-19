@@ -2,8 +2,7 @@
 Servidor de cámara (camera/webrtc_server.py) con cámara SIMULADA: HTTP y /ws/signal reales sobre 127.0.0.1
 (uvicorn en un subproceso), más pruebas en proceso del ring buffer y del bucle de captura.
 
-Los tests `xfail(strict=True)` documentan bugs abiertos (docs/historial/auditoria_2026-09-18.md, Fase C).
-Se comprueban con el parche aplicado:  python -m pytest tests/test_camera_server.py --runxfail
+Cubren los bugs de la auditoría (docs/historial/auditoria_2026-09-18.md, Fase C), ya corregidos en webrtc_server.py.
 Nunca se abre la webcam real ni se escucha fuera de 127.0.0.1. Requiere fastapi/aiortc/opencv/websockets.
 """
 import asyncio
@@ -123,7 +122,6 @@ def test_ws_origin_nexus_permitido(cam_none):
     _ws(cam_none, origin='https://chibio.primbiolab.org').close()
 
 
-@pytest.mark.xfail(strict=True, reason='/preview (servido desde 127.0.0.1:8000) abre el WS con ese Origin y ALLOWED_ORIGINS no lo incluye')
 def test_ws_origin_de_preview_permitido(cam_none):
     _ws(cam_none, origin='http://127.0.0.1:8000').close()
 
@@ -153,7 +151,6 @@ def test_ws_limite_global_y_cabecera_falsificable(cam_none):
 
 # ── Enlace de red: nunca 0.0.0.0 ─────────────────────────────
 
-@pytest.mark.xfail(strict=True, reason='la cámara se instala/arranca en 0.0.0.0:8000 sin autenticación (instalar_servicios.ps1:155)')
 @pytest.mark.parametrize('rel', ['scripts/pc/instalar_servicios.ps1', 'camera/webrtc_server.py'])
 def test_camara_no_escucha_en_todas_las_interfaces(rel):
     with open(os.path.join(ROOT, rel), encoding='utf-8') as f:
@@ -214,7 +211,6 @@ class _Cap:
         return False, None
 
 
-@pytest.mark.xfail(strict=True, reason='una excepción de cap.read() mata la tarea de captura en silencio (el FPS queda congelado)')
 def test_captura_sobrevive_a_una_excepcion_de_read(monkeypatch):
     wm = _module()
     monkeypatch.setattr(wm.cv2, 'VideoCapture', lambda *a, **k: _Cap(good=5, after='raise'))
@@ -230,7 +226,6 @@ def test_captura_sobrevive_a_una_excepcion_de_read(monkeypatch):
     assert asyncio.run(scenario()) is False
 
 
-@pytest.mark.xfail(strict=True, reason='si la cámara deja de entregar frames, /health sigue en "ok" hasta ~80 s (actual_fps no se recalcula)')
 def test_health_deja_de_decir_ok_si_no_llegan_frames(monkeypatch):
     wm = _module()
     monkeypatch.setattr(wm.cv2, 'VideoCapture', lambda *a, **k: _Cap(good=78, after='empty'))

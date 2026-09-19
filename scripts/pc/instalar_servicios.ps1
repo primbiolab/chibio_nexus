@@ -152,7 +152,7 @@ function Instalar-ServicioNssm {
 # ── 4. ChibioCamera ──────────────────────────────────────────────
 Write-Host "`n-- ChibioCamera --" -ForegroundColor Cyan
 Instalar-ServicioNssm -Nombre "ChibioCamera" -Exe $python `
-    -Parametros "-m uvicorn camera.webrtc_server:app --host 0.0.0.0 --port 8000" `
+    -Parametros "-m uvicorn camera.webrtc_server:app --host 127.0.0.1 --port 8000" `
     -Directorio $proyecto
 
 # ── 5. ChibioTunnel (solo si se va a usar el tunel) ──────────────
