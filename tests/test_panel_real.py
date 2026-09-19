@@ -2,9 +2,8 @@
 Panel Windows (lanzador_real.py): funciones puras y lógica sin ventana (self simulado con SimpleNamespace).
 
 No abre la GUI, no ejecuta .ps1, no toca servicios, red ni firewall, y NO lee el config_pc.py real
-(usa archivos sintéticos en tmp_path). Los `xfail(strict=True)` documentan bugs abiertos
-(docs/historial/auditoria_2026-09-18.md, Fase D); se validan con el parche aplicado:
-    python -m pytest tests/test_panel_real.py --runxfail
+(usa archivos sintéticos en tmp_path). Cubren los bugs de la auditoría
+(docs/historial/auditoria_2026-09-18.md, Fase D), ya corregidos en lanzador_real.py y compilar.ps1.
 """
 import http.server
 import os
@@ -127,7 +126,6 @@ def test_diagnostico_solo_lan_no_consulta_el_tunel(sin_sistema, server, monkeypa
     assert res['tunel_ok'] is None and res['camara_ok'] is True and len(res['lineas']) == 3
 
 
-@pytest.mark.xfail(strict=True, reason='/health responde 200 con {"status":"down"} y _http_check solo mira <400: "Cámara local: OK" con la cámara caída')
 def test_camara_down_no_cuenta_como_ok(sin_sistema, server, monkeypatch):
     s = server({'/health': (200, {}, b'{"status":"down","fps":0.0,"peers":0}', 0)})
     monkeypatch.setattr(lr, 'CAMERA_LOCAL_HEALTH', s.url + '/health')
@@ -139,7 +137,6 @@ class _W:
     def configure(self, *a, **k): pass
 
 
-@pytest.mark.xfail(strict=True, reason='Diagnóstico completo en modo solo LAN: KeyError "tunel" en mostrar() (la fila no existe) → el informe nunca se muestra')
 def test_diagnostico_completo_en_modo_solo_lan_muestra_el_informe():
     shown = []
     panel = types.SimpleNamespace(
@@ -181,14 +178,12 @@ def _valores(**kw):
     return v
 
 
-@pytest.mark.xfail(strict=True, reason='guardar() escribe config_pc.py in situ (open "w"): un corte deja el archivo truncado; falta _escribir_config_pc atómica')
 def test_escribir_config_pc_ida_y_vuelta(tmp_path):
     lr._escribir_config_pc(str(tmp_path), _valores())
     assert lr.PanelControl._leer_config_pc(None, str(tmp_path)) == _valores()
     compile((tmp_path / 'config_pc.py').read_text(encoding='utf-8'), 'config_pc.py', 'exec')  # es Python válido
 
 
-@pytest.mark.xfail(strict=True, reason='escritura no atómica de config_pc.py')
 def test_escribir_config_pc_es_atomica(tmp_path, monkeypatch):
     lr._escribir_config_pc(str(tmp_path), _valores())
     antes = (tmp_path / 'config_pc.py').read_bytes()
@@ -201,7 +196,6 @@ def test_escribir_config_pc_es_atomica(tmp_path, monkeypatch):
     assert (tmp_path / 'config_pc.py').read_bytes() == antes
 
 
-@pytest.mark.xfail(strict=True, reason='valores con comillas/saltos de línea rompen config_pc.py (se interpolan en código Python)')
 @pytest.mark.parametrize('malo', ['a"b', "a'b", 'a\\b', 'a\nb'])
 def test_escribir_config_pc_rechaza_caracteres_que_rompen_el_archivo(tmp_path, malo):
     with pytest.raises(ValueError):
@@ -216,7 +210,6 @@ def test_local_host_es_la_bbb_real():
     assert lr.LOCAL_HOST == '192.168.7.2'
 
 
-@pytest.mark.xfail(strict=True, reason='compilar.ps1 compila sin validar LOCAL_HOST')
 def test_compilar_valida_local_host():
     with open(os.path.join(ROOT, 'compilar.ps1'), encoding='utf-8-sig') as f:
         assert re.search(r'LOCAL_HOST', f.read())

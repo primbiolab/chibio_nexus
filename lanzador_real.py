@@ -129,6 +129,38 @@ def _http_check(url, timeout=3, access_headers=None):
         return False
 
 
+def _camera_ok(timeout=3):
+    """/health responde 200 aun con la camara caida ({"status":"down"}): hay que leer el JSON."""
+    req = urllib.request.Request(CAMERA_LOCAL_HEALTH, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status < 400 and json.load(resp).get("status") != "down"
+    except Exception:
+        return False
+
+
+# Se interpolan en codigo Python y _leer_config_pc los lee con regex: comillas, barra y saltos rompen el archivo.
+_CONFIG_PC_PROHIBIDOS = set("\"'\\\r\n")
+
+
+def _escribir_config_pc(proyecto, valores):
+    """Escribe config_pc.py de forma atomica (tmp + os.replace): un corte a mitad no deja el archivo truncado."""
+    for clave, valor in valores.items():
+        if any(c in _CONFIG_PC_PROHIBIDOS for c in valor):
+            raise ValueError(f"{clave}: no puede llevar comillas, barra invertida ni saltos de linea")
+    contenido = "# config_pc.py — generado por el Panel de Control. No se sube a git.\n"
+    for clave in ("TUNNEL_NAME", "CHIBIO_HOSTNAME", "CAMERA_HOSTNAME", "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"):
+        if valores.get(clave):
+            contenido += f'{clave} = "{valores[clave]}"\n'
+    path = os.path.join(proyecto, "config_pc.py")
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(contenido)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
 def _usb_ip_check(usb_index):
     """Consulta (sin elevar) si el adaptador USB de la BBB ya tiene la IP esperada."""
     try:
@@ -1006,7 +1038,7 @@ class PanelControl(ctk.CTk):
             usb_idx = self.usb_index
         red_ok = _usb_ip_check(usb_idx)
         bbb_ok = _tcp_check(LOCAL_HOST, LOCAL_PORT)
-        camara_ok = _http_check(CAMERA_LOCAL_HEALTH)
+        camara_ok = _camera_ok()
         tunel_ok = (
             _http_check(self.tunnel_url, access_headers=self._access_headers)
             if self._use_tunnel else None
@@ -1142,7 +1174,8 @@ class PanelControl(ctk.CTk):
             self._set_row("red", resultado["red_ok"])
             self._set_row("bbb", resultado["bbb_ok"])
             self._set_row("camara", resultado["camara_ok"])
-            self._set_row("tunel", resultado["tunel_ok"])
+            if self._use_tunnel:   # sin tunel no existe la fila "tunel" (KeyError)
+                self._set_row("tunel", resultado["tunel_ok"])
             self._msg_info("Diagnóstico completo", reporte)
 
         self.after(0, mostrar)
@@ -1185,7 +1218,7 @@ class PanelControl(ctk.CTk):
                 f"corriendo en la BBB (revisa cb.sh por PuTTY)."
             )
 
-        camara_ok = _http_check(CAMERA_LOCAL_HEALTH)
+        camara_ok = _camera_ok()
         if camara_ok:
             lineas.append("3. Cámara local: OK")
         else:
@@ -1846,17 +1879,11 @@ class PanelControl(ctk.CTk):
             if not all(valores[k] for k in requeridos):
                 self._msg_error("Faltan datos", "Completa los 3 campos (o cancela y elige 'No' al tunel).")
                 return
-            contenido = (
-                "# config_pc.py — generado por el Panel de Control. No se sube a git.\n"
-                f'TUNNEL_NAME = "{valores["TUNNEL_NAME"]}"\n'
-                f'CHIBIO_HOSTNAME = "{valores["CHIBIO_HOSTNAME"]}"\n'
-                f'CAMERA_HOSTNAME = "{valores["CAMERA_HOSTNAME"]}"\n'
-            )
-            for k in ("CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"):
-                if valores[k]:
-                    contenido += f'{k} = "{valores[k]}"\n'
-            with open(os.path.join(proyecto, "config_pc.py"), "w", encoding="utf-8") as f:
-                f.write(contenido)
+            try:
+                _escribir_config_pc(proyecto, valores)
+            except (OSError, ValueError) as e:
+                self._msg_error("No se pudo guardar", str(e))
+                return
             resultado["ok"] = True
             dlg.destroy()
 
@@ -2018,7 +2045,7 @@ class PanelControl(ctk.CTk):
                 )
 
     def _abrir_camara_navegador(self):
-        if _http_check(CAMERA_LOCAL_HEALTH):
+        if _camera_ok():
             webbrowser.open("http://127.0.0.1:8000/preview")
             self._set_log("Abriendo visor de cámara WebRTC en el navegador.")
         else:
