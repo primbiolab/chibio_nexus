@@ -7,7 +7,7 @@ import random
 import time
 import math
 import functools
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, has_request_context
 from threading import Thread, Lock
 import threading
 import numpy as np
@@ -289,9 +289,12 @@ def _resolveM(M):
 def _needs_present(fn):
     # I2CCom hace os._exit(4) si el reactor no está presente (fallo seguro ante bug de software).
     # Los endpoints que tocan I2C deben responder 409 en vez de tumbar el proceso de los 8 reactores.
+    # El 409 solo existe dentro de una petición HTTP: en hilos (Thermostat, runExperiment, CustomProgram)
+    # jsonify lanzaría RuntimeError y el hilo moriría en silencio con el calefactor en su último PWM;
+    # ahí se deja actuar a I2CCom, cuyo os._exit es el fallo seguro.
     @functools.wraps(fn)
     def wrapper(M, *a, **k):
-        if sysData[_resolveM(M)]['present'] == 0:
+        if has_request_context() and sysData[_resolveM(M)]['present'] == 0:
             return jsonify({'error': 'Reactor ausente'}), 409
         return fn(M, *a, **k)
     return wrapper
@@ -2446,15 +2449,22 @@ def ExperimentReset():
     return ('', 204)   
 
 @application.route("/Experiment/<value>/<M>",methods=['POST'])
-@_needs_present
 def ExperimentStartStop(M,value):
-    #Stops or starts an experiment. 
+    #Stops or starts an experiment.
     global sysData
     global sysDevices
     global sysItems
     M=_resolveM(M)
-       
+
     value=int(value)
+    if sysData[M]['present']==0:
+        # Reactor ausente (p. ej. ThermometerInternal falló en caliente): no se toca I2C (I2CCom haría os._exit).
+        # Parar solo baja las banderas para que runExperiment no se reprograme; arrancar se rechaza.
+        if value:
+            return jsonify({'error': 'Reactor ausente'}), 409
+        sysData[M]['Experiment']['ON']=0
+        sysData[M]['OD']['ON']=0
+        return ('', 204)
     #Turning it on involves keeping current pump directions,
     if (value and (sysData[M]['Experiment']['ON']==0)):
         

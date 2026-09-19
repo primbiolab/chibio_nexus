@@ -5,10 +5,10 @@ Carga app.py con stubs de Adafruit_GPIO / Adafruit_BBIO / smbus2 / config, sin
 BeagleBone. Los tests de hardware sustituyen I2CCom y setPWM por grabadores, así
 que se ejecuta el código real de PumpModulation, SetOutput, validadores, etc.
 
-Los tests marcados `xfail(strict=True)` documentan bugs abiertos de la auditoría
-(docs/historial/auditoria_2026-09-18.md). Al corregir un bug su test pasa a XPASS y,
-por ser strict, falla: quita entonces el marcador. Para comprobar un parche sin
-tocar los marcadores:  python -m pytest tests/test_app_real.py --runxfail
+Un test marcado `xfail(strict=True)` documenta una brecha abierta conocida (hoy solo
+el DoS de memoria vía variables en /injectProtocol/; ver docs/pendientes.md). Al
+corregirla su test pasa a XPASS y, por ser strict, falla: quita entonces el marcador.
+Para comprobar un parche sin tocar los marcadores:  python -m pytest tests/test_app_real.py --runxfail
 
 Variable CHIBIO_APP_PATH: apunta a una copia parcheada de app.py (por defecto app.py).
 
@@ -385,3 +385,73 @@ def test_cambiar_potencia_en_caliente_no_detiene_la_bomba(client, appmod, bench)
         _post(client, '/SetOutputOn/Pump1/0/M0')
         time.sleep(0.4)
     assert paradas == []
+
+
+# ─────────────────────────────────────────────────────────────
+# Reactor ausente (code-review ultra #1): _needs_present
+# ─────────────────────────────────────────────────────────────
+
+def test_stop_con_reactor_ausente_baja_banderas_sin_tocar_i2c(client, appmod):
+    """Si present pasa a 0 en caliente, Stop debe poder parar el experimento (no 409) y sin I2C."""
+    M = 'M7'
+    appmod.sysData[M]['present'] = 0
+    appmod.sysData[M]['Experiment']['ON'] = 1
+    appmod.sysData[M]['OD']['ON'] = 1
+    appmod.EXIT_CALLS.clear()
+    try:
+        r = _post(client, '/Experiment/0/M7')
+        time.sleep(0.3)              # deja correr cualquier hilo lanzado por SetOutputOn
+        assert r.status_code == 204
+        assert appmod.sysData[M]['Experiment']['ON'] == 0
+        assert appmod.sysData[M]['OD']['ON'] == 0
+        assert appmod.EXIT_CALLS == []
+    finally:
+        appmod.sysData[M]['Experiment']['ON'] = 0
+        appmod.sysData[M]['OD']['ON'] = 0
+
+
+def test_start_con_reactor_ausente_409(client, appmod):
+    appmod.sysData['M7']['present'] = 0
+    appmod.EXIT_CALLS.clear()
+    r = _post(client, '/Experiment/1/M7')
+    assert r.status_code == 409
+    assert appmod.sysData['M7']['Experiment']['ON'] == 0
+    assert appmod.EXIT_CALLS == []
+
+
+@pytest.mark.parametrize('call', [
+    lambda a: a.MeasureOD('M7'),
+    lambda a: a.MeasureTemp('M7', 'Internal'),
+    lambda a: a.GetSpectrum('M7', 'x1'),
+])
+def test_medir_ausente_desde_hilo_conserva_el_fallo_seguro(appmod, call):
+    """Fuera de una petición HTTP (Thermostat, runExperiment, CustomProgram) el 409 no existe:
+    _needs_present no debe lanzar RuntimeError (mataba el hilo en silencio, con el calefactor
+    en su último PWM) sino dejar actuar a I2CCom, que es el fallo seguro (os._exit)."""
+    appmod.sysData['M7']['present'] = 0
+    appmod.EXIT_CALLS.clear()
+    errores = []
+
+    def run():
+        try:
+            call(appmod)
+        except BaseException as e:   # HardExit = os._exit simulado
+            errores.append(e)
+
+    t = threading.Thread(target=run)
+    t.start()
+    t.join(5)
+    assert not any(isinstance(e, RuntimeError) for e in errores), errores
+    assert 4 in appmod.EXIT_CALLS   # el HardExit simulado a veces lo absorbe un except de app.py; os._exit real no
+
+
+# ─────────────────────────────────────────────────────────────
+# Brecha conocida: DoS de memoria vía variables (code-review ultra #1, hallazgo 3)
+# ─────────────────────────────────────────────────────────────
+
+@pytest.mark.xfail(strict=True, reason='Mult/Add sobre nombres o sysData[...] no se acota con un validador '
+                   'estático (la ramp del Architect usa "*" con nombres); requiere sandbox de ejecución '
+                   '(subproceso + rlimit). Ver docs/pendientes.md')
+def test_inject_dos_por_variable_rechazado(client, proto_en_tmp):
+    r = _post(client, '/injectProtocol/', json={'code': fsm('a = [0]', 'a = a * 1000000000')})
+    assert r.status_code == 400
