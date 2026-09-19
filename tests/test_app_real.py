@@ -455,3 +455,15 @@ def test_medir_ausente_desde_hilo_conserva_el_fallo_seguro(appmod, call):
 def test_inject_dos_por_variable_rechazado(client, proto_en_tmp):
     r = _post(client, '/injectProtocol/', json={'code': fsm('a = [0]', 'a = a * 1000000000')})
     assert r.status_code == 400
+
+
+@pytest.mark.xfail(strict=True, reason='2º /Experiment/1/ con el experimento ON cae en el else y lo PARA (doble clic en Iniciar); ' + BUG)
+def test_experiment_start_repetido_no_lo_para(client, appmod, bench, monkeypatch):
+    monkeypatch.setattr(appmod, 'runExperiment', lambda M, placeholder: None)
+    try:
+        assert _post(client, '/Experiment/1/M0').status_code == 204
+        assert appmod.sysData['M0']['Experiment']['ON'] == 1
+        assert _post(client, '/Experiment/1/M0').status_code == 204
+        assert appmod.sysData['M0']['Experiment']['ON'] == 1
+    finally:
+        _post(client, '/Experiment/0/M0')
