@@ -2487,7 +2487,7 @@ def ExperimentStartStop(M,value):
         sysDevices[M]['Experiment'].setDaemon(True)
         sysDevices[M]['Experiment'].start();
         
-    else:
+    elif not value:   # un 2º start con el experimento ya ON no debe pararlo (doble clic)
         sysData[M]['Experiment']['ON']=0
         sysData[M]['OD']['ON']=0
         addTerminal(M,'Experiment Stopping at end of cycle')

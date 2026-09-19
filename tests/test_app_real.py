@@ -457,7 +457,6 @@ def test_inject_dos_por_variable_rechazado(client, proto_en_tmp):
     assert r.status_code == 400
 
 
-@pytest.mark.xfail(strict=True, reason='2º /Experiment/1/ con el experimento ON cae en el else y lo PARA (doble clic en Iniciar); ' + BUG)
 def test_experiment_start_repetido_no_lo_para(client, appmod, bench, monkeypatch):
     monkeypatch.setattr(appmod, 'runExperiment', lambda M, placeholder: None)
     try:
