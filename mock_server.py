@@ -343,12 +343,29 @@ _DENIED_NAMES = {
     'super', 'property',
 }
 
+# Nombres que el protocolo NO puede reasignar: si pudiera hacer `str = '{0.__globals__}'.format`
+# obtendría un alias de una función permitida apuntando a otra cosa y saltaría la allowlist de llamadas.
+_PROTECTED_NAMES = _ALLOWED_CALLS | _DENIED_NAMES | {'sysData', 'M', 'program', 'time', 'math', 'datetime'}
+_SEQUENCE_NODES = (ast.List, ast.Tuple, ast.JoinedStr)
+
 def _validate_protocol_ast(tree):
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_AST_NODES):
             raise ValueError('Construcción no permitida: ' + type(node).__name__)
         if isinstance(node, ast.Attribute) and node.attr.startswith('_'):
             raise ValueError('Acceso a atributo no permitido: ' + node.attr)
+        if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
+            raise ValueError('Asignación a atributo no permitida: ' + node.attr)  # p. ej. math.log10 = abs
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in _PROTECTED_NAMES:
+            raise ValueError('Reasignación no permitida: ' + node.id)
+        if isinstance(node, ast.Pow):  # el codegen no emite '**'; 9**9**9 cuelga/agota RAM dentro de exec
+            raise ValueError('Potencia no permitida')
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+            for side in (node.left, node.right):  # [0]*10**9 / 'x'*n
+                if isinstance(side, _SEQUENCE_NODES) or (isinstance(side, ast.Constant) and isinstance(side.value, str)):
+                    raise ValueError('Repetición de secuencias no permitida')
+        if isinstance(node, ast.Constant) and isinstance(node.value, str) and '__' in node.value:
+            raise ValueError('Cadena no permitida')
         if isinstance(node, ast.Name) and node.id in _DENIED_NAMES:
             raise ValueError('Nombre no permitido: ' + node.id)
         if isinstance(node, ast.Call):
