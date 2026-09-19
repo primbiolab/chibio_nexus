@@ -5,9 +5,8 @@ pasa por `_fsm_dedent` + `_validate_protocol_ast` + `_nexus_exec` de app.py (har
 Criterio de éxito de cada caso: el protocolo es aceptado, `Custom.Status` avanza ciclo a ciclo
 hasta 99.0 ("Protocolo Finalizado"), sin errores y sin dosificar de más.
 
-Los tests `xfail(strict=True)` documentan bugs abiertos (docs/historial/auditoria_2026-09-18.md, Fase A).
-Para comprobar un parche de architect.js sin tocar los marcadores:
-    CHIBIO_ARCHITECT_PATH=<copia parcheada> python -m pytest tests/test_architect_fsm.py --runxfail
+Los bugs de la auditoría (docs/historial/auditoria_2026-09-18.md, Fase A) están corregidos en architect.js.
+Para probar una copia de architect.js:  CHIBIO_ARCHITECT_PATH=<copia> python -m pytest tests/test_architect_fsm.py
 Requiere Node en el PATH (si no, se omiten).
 """
 import copy
@@ -70,26 +69,17 @@ def wait_min(d=1):
     return N('wait', unit='min', duration=d)
 
 
-BUG_LAST = 'continue de compileFSM salta el último nodo (architect.js:788): nunca escribe Status=exitState'
-BUG_TRIG = 'trigger "esperar" repite en cada ciclo los bloques síncronos previos de su mismo estado'
-BUG_EMPTY = 'trigger sin hijos (no último) apunta a un estado sin manejador → atascado'
-BUG_NEST = 'modo de control anidado en bucle/trigger: compileFSM lo ignora y deja el estado sin manejador'
-BUG_GEN = "motor de generaciones emite `'Generations' not in ...` (ast.NotIn): el servidor rechaza todo protocolo con generaciones"
-BUG_LOG = 'log: la barra invertida no se escapa → SyntaxError o inyección de llamadas permitidas'
-
-
-def case(name, nodes, doses=None, od=1.0, growth=0.0, bug=None, events=()):
-    marks = [pytest.mark.xfail(strict=True, reason=bug)] if bug else []
-    return pytest.param(name, nodes, doses or {}, od, growth, tuple(events), id=name, marks=marks)
+def case(name, nodes, doses=None, od=1.0, growth=0.0, events=()):
+    return pytest.param(name, nodes, doses or {}, od, growth, tuple(events), id=name)
 
 
 CASES = [
-    case('solo_inits', inits(), bug=BUG_LAST),
-    case('inits_turbidostat', inits() + [N('turbidostat')], events=[('on', 'OD', 1)], bug=BUG_LAST),
-    case('inits_chemostat', inits() + [N('chemostat')], bug=BUG_LAST),
-    case('inits_zigzag', inits() + [N('zigzag')], events=[('on', 'Zigzag', 1)], bug=BUG_LAST),
+    case('solo_inits', inits()),
+    case('inits_turbidostat', inits() + [N('turbidostat')], events=[('on', 'OD', 1)]),
+    case('inits_chemostat', inits() + [N('chemostat')]),
+    case('inits_zigzag', inits() + [N('zigzag')], events=[('on', 'Zigzag', 1)]),
     case('pump_solo', inits() + [pump()], {'Pump1': 1}),
-    case('pump_y_modo_al_final', inits() + [pump(), N('turbidostat')], {'Pump1': 1}, bug=BUG_LAST),
+    case('pump_y_modo_al_final', inits() + [pump(), N('turbidostat')], {'Pump1': 1}),
     case('modo_y_luego_pump', inits() + [N('turbidostat'), pump()], {'Pump1': 1}),
     case('thermostat', inits() + [N('thermostat', temp=40.0)], events=[('on', 'Thermostat', 1)]),
     case('ramp_temp', inits() + [N('ramp_temp', duration=3)], events=[('on', 'Thermostat', 1)]),
@@ -105,33 +95,32 @@ CASES = [
     case('measure_od', inits() + [N('measure_od')], events=[('measure', 'OD', None)]),
     case('wait_seg', inits() + [N('wait', unit='sec', duration=2), pump()], {'Pump1': 1}),
     case('wait_min', inits() + [wait_min(3), pump()], {'Pump1': 1}),
-    case('wait_gen', inits() + [N('wait', unit='gen', duration=1), pump()], {'Pump1': 1}, growth=50.0,
-         bug=BUG_GEN),
+    case('wait_gen', inits() + [N('wait', unit='gen', duration=1), pump()], {'Pump1': 1}, growth=50.0),
     case('trigger_generaciones',
          inits() + [N('trigger', behavior='if', tvar='Generations', op='>=', val=0.0, children=[pump()])],
-         {'Pump1': 1}, bug=BUG_GEN),
+         {'Pump1': 1}),
     case('log_simple', inits() + [N('log', msg='hola')]),
     case('log_comilla', inits() + [N('log', msg="it's")]),
-    case('log_barra_invertida', inits() + [N('log', msg='ruta\\')], bug=BUG_LOG),
+    case('log_barra_invertida', inits() + [N('log', msg='ruta\\')]),
     case('bucle_x3', inits() + [loop(3, pump())], {'Pump1': 3}),
     case('bucle_con_espera', inits() + [loop(2, pump(), wait_min(1))], {'Pump1': 2}),
     case('bucle_en_bucle', inits() + [loop(2, loop(2, pump()))], {'Pump1': 4}),
     case('sincrono_antes_de_bucle', inits() + [pump('Pump1'), loop(2, pump('Pump2'))],
          {'Pump1': 1, 'Pump2': 2}),
     case('bucle_hijos_terminan_en_modo', inits() + [loop(2, pump(), N('turbidostat'))],
-         {'Pump1': 2}, bug=BUG_LAST),
+         {'Pump1': 2}),
     case('trigger_esperar_cumplido', inits() + [trig('wait', pump())], {'Pump1': 1}, od=1.0),
     case('trigger_if_cumplido', inits() + [trig('if', pump())], {'Pump1': 1}, od=1.0),
     case('trigger_if_no_cumplido', inits() + [trig('if', pump())], {'Pump1': 0}, od=0.1),
     case('trigger_ultimo_sin_hijos', inits() + [pump(), trig('if')], {'Pump1': 1}),
-    case('trigger_sin_hijos_no_ultimo', inits() + [trig('if'), pump()], {'Pump1': 1}, bug=BUG_EMPTY),
+    case('trigger_sin_hijos_no_ultimo', inits() + [trig('if'), pump()], {'Pump1': 1}),
     case('trigger_en_bucle', inits() + [loop(2, trig('if', pump()))], {'Pump1': 2}),
     case('trigger_anidado', inits() + [trig('if', trig('if', pump()))], {'Pump1': 1}),
     case('trigger_espera_no_redosifica_previo',
          inits() + [pump('Pump1'), trig('wait', pump('Pump2'))], {'Pump1': 1, 'Pump2': 1},
-         od=lambda c: 0.1 if c < 8 else 1.0, bug=BUG_TRIG),
+         od=lambda c: 0.1 if c < 8 else 1.0),
     case('modo_anidado_en_bucle', inits() + [loop(1, N('turbidostat'))],
-         events=[('on', 'OD', 1)], bug=BUG_NEST),
+         events=[('on', 'OD', 1)]),
     case('mezcla_completa',
          inits() + [N('turbidostat'), N('thermostat', temp=38.0), wait_min(1), pump('Pump1'),
                     N('ramp_temp', duration=2), loop(2, pump('Pump2'), wait_min(1)),
@@ -211,7 +200,6 @@ def test_inits_se_aplican_en_el_primer_ciclo(fsm, compiled, appmod):
     assert ('on', 'Thermostat', 1) in res.events and ('on', 'Stir', 1) in res.events
 
 
-@pytest.mark.xfail(strict=True, reason=BUG_LOG)
 def test_log_no_inyecta_llamadas_permitidas(fsm):
     """Un msg con \\'); llamada #  cierra la cadena y ejecuta SetOutputOn (pasa la allowlist)."""
     msg = "\\'); SetOutputOn(M, \"Heat\", 1) #"
@@ -236,7 +224,6 @@ def _harness(mode, data):
 XSS = '<img src=x onerror=alert(1)>'
 
 
-@pytest.mark.xfail(strict=True, reason='import .chibio/Gemini: node.type sin validar llega a innerHTML (architect.js:374,433)')
 def test_import_descarta_tipos_desconocidos_y_sanea_campos():
     out = _harness('sanitize', [
         {'id': 'a', 'type': XSS},
@@ -255,13 +242,11 @@ def test_import_descarta_tipos_desconocidos_y_sanea_campos():
     assert out[2]['children'] == [] and out[2]['op'] == '>=' and out[2]['behavior'] == 'wait'
 
 
-@pytest.mark.xfail(strict=True, reason='import .chibio: pumps sin validar llega a innerHTML (architect.js:525)')
 def test_import_caudales_solo_numeros():
     out = _harness('pumps', {'Pump1': XSS, 'Pump2': '2.5', 'Pump3': -1, 'Pump4': None, 'Evil': 1})
     assert out == {'Pump1': 1.0, 'Pump2': 2.5, 'Pump3': 1.0, 'Pump4': 1.0}
 
 
-@pytest.mark.xfail(strict=True, reason='los dos caminos de import (archivo y postMessage) y la IA deben usar el saneador')
 def test_los_tres_caminos_de_entrada_usan_el_saneador():
     src = open(os.path.join(os.path.dirname(HARNESS), '..', '..', 'static', 'js', 'architect.js'),
                encoding='utf-8').read()
