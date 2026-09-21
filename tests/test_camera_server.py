@@ -243,3 +243,19 @@ def test_health_deja_de_decir_ok_si_no_llegan_frames(monkeypatch):
 
     before, after = asyncio.run(scenario())
     assert before == 'ok' and after != 'ok'
+
+
+def test_ice_descarta_interfaces_sin_ruta_pero_nunca_todas():
+    # aioice espera 5 s por cada interfaz que acepta bind y no tiene ruta (host-only de VirtualBox, VPN caída):
+    # cada espectador tardaba +5 s en recibir el answer. Se descartan; si ninguna pasa, se conservan todas.
+    ws = _module()
+    ok = {'172.16.24.111', '192.168.7.1'}
+    addrs = ['169.254.155.226', '192.168.7.1', '192.168.56.1', '172.16.24.111']
+    assert ws._filter_reachable_hosts(addrs, lambda a: a in ok) == ['192.168.7.1', '172.16.24.111']
+    assert ws._filter_reachable_hosts(addrs, lambda a: False) == addrs
+
+
+def test_ice_get_host_addresses_de_aioice_esta_filtrado():
+    from aioice import ice
+    _module()
+    assert ice.get_host_addresses.__module__ == _module().__name__

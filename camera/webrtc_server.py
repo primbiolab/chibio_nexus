@@ -16,6 +16,7 @@ import asyncio
 import json
 import logging
 import re
+import socket
 import time
 import traceback
 import uuid
@@ -64,11 +65,38 @@ try:
 except Exception as _e:
     log.warning("No se pudo elevar MAX_BITRATE VP8 de aiortc: %s", _e)
 
+# aioice espera 5 s por cada interfaz local que acepta bind pero no tiene ruta (host-only de VirtualBox,
+# VPN caída): cada espectador tardaba +5 s en recibir el answer. Se descartan las IPv4 sin ruta;
+# si ninguna pasa (PC sin salida a internet) se conservan todas para no dejar sin candidatos a la LAN.
+def _filter_reachable_hosts(addrs, probe):
+    ok = [a for a in addrs if probe(a)]
+    return ok or list(addrs)
+
+
+def _has_route(addr):
+    if ":" in addr:
+        return True
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.bind((addr, 0))
+            s.connect(("8.8.8.8", 9))   # UDP connect solo consulta la tabla de rutas: no envía nada
+        return True
+    except OSError:
+        return False
+
+
+try:
+    from aioice import ice as _ice
+    _orig_host_addresses = _ice.get_host_addresses
+    _ice.get_host_addresses = lambda *a, **k: _filter_reachable_hosts(_orig_host_addresses(*a, **k), _has_route)
+except Exception as _e:
+    log.warning("No se pudo filtrar las interfaces sin ruta de aioice: %s", _e)
+
 # ─────────────────────────────────────────────
 # Configuración
 # ─────────────────────────────────────────────
 
-CAMERA_INDEX   = 0       # índice de cámara (0 = default)
+CAMERA_INDEX  = 0       # índice de cámara (0 = default)
 TARGET_FPS     = 30      # FPS deseados (ajustar según capacidad de la cámara)
 FRAME_WIDTH    = 1280    # resolución ancho
 FRAME_HEIGHT   = 720     # resolución alto (16:9 nativo, soportado por casi todas las webcams a 60fps)
