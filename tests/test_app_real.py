@@ -138,7 +138,6 @@ def bench(appmod, monkeypatch):
     appmod.sysData[M]['Experiment']['ON'] = 0
     for p in ('Pump1', 'Pump2', 'Pump3', 'Pump4'):
         appmod.sysData[M][p].update(ON=0, target=0.0, direction=1.0)
-        appmod.sysDevices[M][p]['active'] = 0
     yield b
     for p in ('Pump1', 'Pump2', 'Pump3', 'Pump4', 'Heat', 'UV', 'Stir'):
         appmod.sysData[M][p]['ON'] = 0
@@ -452,8 +451,13 @@ def test_medir_ausente_desde_hilo_conserva_el_fallo_seguro(appmod, call):
 @pytest.mark.xfail(strict=True, reason='Mult/Add sobre nombres o sysData[...] no se acota con un validador '
                    'estático (la ramp del Architect usa "*" con nombres); requiere sandbox de ejecución '
                    '(subproceso + rlimit). Ver docs/pendientes.md')
-def test_inject_dos_por_variable_rechazado(client, proto_en_tmp):
-    r = _post(client, '/injectProtocol/', json={'code': fsm('a = [0]', 'a = a * 1000000000')})
+@pytest.mark.parametrize('body', [
+    ['a = [0]', 'a = a * 1000000000'],
+    ['a = [0]', 'a *= 1000000000'],      # AugAssign: variante del mismo hueco (ultra #2)
+    ['a = [0]', 'a += a'],               # duplicación sin Mult
+])
+def test_inject_dos_por_variable_rechazado(client, proto_en_tmp, body):
+    r = _post(client, '/injectProtocol/', json={'code': fsm(*body)})
     assert r.status_code == 400
 
 

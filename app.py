@@ -210,10 +210,10 @@ sysDevices = {'M0' : {
     'DAC' : {'device' : 0},
     'Pumps' : {'device' : 0,'startup' : 0, 'frequency' : 0},
     'PWM' : {'device' : 0,'startup' : 0, 'frequency' : 0},
-    'Pump1' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump2' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump3' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump4' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
+    'Pump1' : {'thread' : 0,'threadCount' : 0},
+    'Pump2' : {'thread' : 0,'threadCount' : 0},
+    'Pump3' : {'thread' : 0,'threadCount' : 0},
+    'Pump4' : {'thread' : 0,'threadCount' : 0},
     'Experiment' : {'thread' : 0},
     'Thermostat' : {'thread' : 0,'threadCount' : 0},
     
@@ -551,7 +551,6 @@ def initialise(M):
         sysData[M][PUMP]['ON']=0
         sysData[M][PUMP]['direction']=1.0
         sysDevices[M][PUMP]['threadCount']=0
-        sysDevices[M][PUMP]['active']=0
     
     
     sysData[M]['Heat']['default']=0;
