@@ -332,13 +332,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mitigación: en el servicio real, con espectadores simultáneos, algún pc llegaba a 'closed' sin que el finally
+# del WS ni on_state_change lo sacaran de peer_connections (sin 'Limpieza completada' en el log): el slot
+# quedaba ocupado para siempre. Causa raíz sin identificar; este barrido libera el slot y deja rastro en el log.
+async def _reap_dead_peers():
+    for client_id, pc in list(peer_connections.items()):
+        if pc.connectionState in ("closed", "failed"):
+            peer_connections.pop(client_id, None)
+            peer_ips.pop(client_id, None)
+            log.warning(f"[{client_id}] Peer {pc.connectionState} sin limpiar: liberado por el barrido")
+            try:
+                await asyncio.wait_for(pc.close(), 5)
+            except Exception as e:
+                log.warning(f"[{client_id}] close() del barrido falló: {e!r}")
+
+
+async def _reap_loop():
+    while True:
+        await asyncio.sleep(10)
+        await _reap_dead_peers()
+
+
+_reap_task = None
+
+
 @app.on_event("startup")
 async def startup():
+    global _reap_task
     camera.start()
+    _reap_task = asyncio.ensure_future(_reap_loop())
     log.info("Servidor listo")
 
 @app.on_event("shutdown")
 async def shutdown():
+    if _reap_task:
+        _reap_task.cancel()
     camera.stop()
     for pc in list(peer_connections.values()):
         await pc.close()

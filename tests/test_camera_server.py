@@ -259,3 +259,33 @@ def test_ice_get_host_addresses_de_aioice_esta_filtrado():
     from aioice import ice
     _module()
     assert ice.get_host_addresses.__module__ == _module().__name__
+
+
+class _FakePC:
+    def __init__(self, state):
+        self.connectionState = state
+        self.closed = False
+
+    async def close(self):
+        self.closed = True
+
+
+def test_peer_cerrado_que_sigue_registrado_se_libera():
+    # e2e 2026-09-21 (servicio real, 5 espectadores a la vez): pc en 'closed' pero ni el finally del WS
+    # ni on_state_change lo sacaron de peer_connections (sin 'Limpieza completada' en el log) → /health peers
+    # se quedaba en 2-3 y con MAX_PEERS=8 la cámara acabaría rechazando a todos.
+    ws = _module()
+    ws.peer_connections.clear()
+    ws.peer_ips.clear()
+    muerto, vivo = _FakePC('closed'), _FakePC('connected')
+    fallido = _FakePC('failed')
+    ws.peer_connections.update({'muerto': muerto, 'vivo': vivo, 'fallido': fallido})
+    ws.peer_ips.update({'muerto': '10.0.0.1', 'vivo': '10.0.0.2', 'fallido': '10.0.0.3'})
+    try:
+        asyncio.run(ws._reap_dead_peers())
+        assert set(ws.peer_connections) == {'vivo'}
+        assert set(ws.peer_ips) == {'vivo'}
+        assert muerto.closed and fallido.closed and not vivo.closed
+    finally:
+        ws.peer_connections.clear()
+        ws.peer_ips.clear()
