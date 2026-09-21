@@ -1261,36 +1261,11 @@ function onCamSlider(){
   _camDebounce = setTimeout(_applyCssFilter, 150);
 }
 
-// ── Polling de /health: FPS, peers, estado online/offline ──
-function _fetchCamStatus(){
-  $.ajax({
-    url: _camBase + '/health',
-    method: 'GET',
-    timeout: 2000,
-    success: function(data){
-      _setCamStatus('online');
-      var fpsEl   = document.getElementById('cam-fps-val');
-      var peersEl = document.getElementById('cam-peers-val');
-      if(fpsEl)   fpsEl.textContent   = (data.fps   !== undefined) ? data.fps.toFixed(1) + ' fps' : '--';
-      if(peersEl) peersEl.textContent = (data.peers !== undefined) ? data.peers : '--';
-    },
-    error: function(){
-      _setCamStatus('offline');
-      var fpsEl   = document.getElementById('cam-fps-val');
-      var peersEl = document.getElementById('cam-peers-val');
-      if(fpsEl)   fpsEl.textContent   = '--';
-      if(peersEl) peersEl.textContent = '--';
-    }
-  });
-}
-
+// ── Polling de stats por WebSocket: FPS y peers (el estado online/offline lo fijan WS y WebRTC) ──
+// No hay fetch HTTP cross-origin a la cámara: Access lo redirige al login sin CORS si no hay cookie.
 function _startCamPoll(){
   _stopCamPoll();
-  _fetchCamStatus();
-  _camPollTimer = setInterval(function(){
-    _fetchCamStatus();
-    _requestWsStats();
-  }, 1500);
+  _camPollTimer = setInterval(_requestWsStats, 1500);
 }
 
 function _stopCamPoll(){
@@ -1326,6 +1301,12 @@ function _setCamStatus(status){
   var badge = document.getElementById('cam-offline-badge');
   if(dot)   dot.className = 'cam-dot ' + status;
   if(badge) badge.style.display = (status === 'offline') ? 'flex' : 'none';
+  if(status === 'offline'){
+    var fpsEl   = document.getElementById('cam-fps-val');
+    var peersEl = document.getElementById('cam-peers-val');
+    if(fpsEl)   fpsEl.textContent   = '--';
+    if(peersEl) peersEl.textContent = '--';
+  }
 }
 
 function _updateCamReactorInfo(){
