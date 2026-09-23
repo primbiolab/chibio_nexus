@@ -2,6 +2,12 @@
 /* Polling de datos del sistema con backoff exponencial y pausa en tab oculto */
 function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+/* Reactor seleccionado por ESTA pestaña (sessionStorage: aislado por pestaña, no se
+   comparte con otras). Antes se confiaba en sysItems['UIDevice'], un flag global del
+   servidor: cambiar de reactor en una pestaña movía a TODAS las conectadas. */
+var _selM = (function(){ try{ return sessionStorage.getItem('chibio_selM') || 'M0'; }catch(e){ return 'M0'; } })();
+function _setSelM(M){ _selM = M; try{ sessionStorage.setItem('chibio_selM', M); }catch(e){} }
+
 var _pollInterval = 2000;
 var _pollTimer    = null;
 var _pollBusy     = false;
@@ -12,7 +18,7 @@ function _pollTick() {
   if (document.hidden) { _pollTimer = setTimeout(_pollTick, 2000); return; }
   _pollBusy = true;
   $.ajax({
-    type: 'GET', url: '/getSysdata/', dataType: 'json', timeout: 5000,
+    type: 'GET', url: '/getSysdata/'+_selM, dataType: 'json', timeout: 5000,
     success: function(data) { _pollInterval = 2000; updateData(data); _updateCloudPill(data.cloud); },
     error:   function() { _pollInterval = Math.min(_pollInterval * 2, 30000); },
     complete:function() { _pollBusy = false; _pollTimer = setTimeout(_pollTick, _pollInterval); }
@@ -195,7 +201,7 @@ window.addEventListener('message', function(e){
     var v=Math.min(20,Math.max(0,parseFloat(e.data.val)||0));
     window._lastSyncedVolume=v;
     $('#VolumeInput').val(v);
-    ajax('/SetOutputTarget/Volume/0/'+v,null);
+    ajax('/SetOutputTarget/Volume/'+_selM+'/'+v,null);
   }
 });
 
@@ -723,53 +729,53 @@ function toggleCal(){
 }
 
 /* ── Acciones ───────────────────────────────────── */
-function changeDevice(M){ajax('/changeDevice/'+M,null);}
+function changeDevice(M){_setSelM(M);ajax('/changeDevice/'+M,null);}
 function doScanDevices(){ajax('/scanDevices/all',null);spawnToast('info','fa-solid fa-satellite-dish','Escaneando','Buscando dispositivos en la red...', 3000);}
 function startExperiment(){
-  ajax('/Experiment/1/0',function(){
+  ajax('/Experiment/1/'+_selM,function(){
     spawnToast('ok','fa-solid fa-play','Experimento Iniciado','El experimento ha comenzado a ejecutarse.', 4000);
   });
   if(!window._customOn){ window._customOn=true; toggleCustom(); }   // optimista: un 2º clic antes del sondeo no debe volver a voltear SetCustom
 }
 function stopExperiment(){
-  ajax('/Experiment/0/0',function(){
+  ajax('/Experiment/0/'+_selM,function(){
     spawnToast('warn','fa-solid fa-stop','Experimento Detenido','El experimento se ha detenido.', 4000);
   });
   if(window._customOn){ window._customOn=false; toggleCustom(); }
 }
-function resetExperiment(){ajax('/ExperimentReset',null);spawnToast('warn','fa-solid fa-rotate-left','Reset','Todos los parámetros han sido reiniciados.', 3500);}
-function setOD(){var v=_numVal('#ODInput','OD objetivo'); if(v!==null) ajax('/SetOutputTarget/OD/0/'+v,null);}
-function measureOD(){ajax('/MeasureOD/0',null);}
+function resetExperiment(){ajax('/ExperimentReset/'+_selM,null);spawnToast('warn','fa-solid fa-rotate-left','Reset','Todos los parámetros han sido reiniciados.', 3500);}
+function setOD(){var v=_numVal('#ODInput','OD objetivo'); if(v!==null) ajax('/SetOutputTarget/OD/'+_selM+'/'+v,null);}
+function measureOD(){ajax('/MeasureOD/'+_selM,null);}
 function calibrateOD(){
   var raw=_numVal('#OD0Input','Raw medido'); if(raw===null) return;
   var act=_numVal('#OD0Actual','OD real'); if(act===null) return;
-  ajax('/CalibrateOD/OD0/0/'+raw+'/'+act,null);
+  ajax('/CalibrateOD/OD0/'+_selM+'/'+raw+'/'+act,null);
 }
 function setVolume(){
   var v=Math.min(20,Math.max(0,parseFloat($('#VolumeInput').val())||0));
   $('#VolumeInput').val(v);
-  ajax('/SetOutputTarget/Volume/0/'+v,null);
+  ajax('/SetOutputTarget/Volume/'+_selM+'/'+v,null);
   archCmd('setVolume',v);
 }
 function toggleODRegulate(){
   var odOn = _lastData && _lastData.OD && _lastData.OD.ON === 1;
-  ajax('/SetOutputOn/OD/2/0', null);
+  ajax('/SetOutputOn/OD/2/'+_selM, null);
   if (!odOn) {
     _mb('Zigzag', false, 'on');
   }
 }
 function toggleZigzag(){
   var zzOn = _lastData && _lastData.Zigzag && _lastData.Zigzag.ON === 1;
-  ajax('/SetOutputOn/Zigzag/2/0', null);
+  ajax('/SetOutputOn/Zigzag/2/'+_selM, null);
   if (!zzOn) {
     _mb('ODRegulate', false, 'on');
   }
 }
-function measureTemp(w){ajax('/MeasureTemp/'+w+'/0',null);}
-function setThermostat(){var v=_numVal('#ThermostatInput','Termostato'); if(v!==null) ajax('/SetOutputTarget/Thermostat/0/'+v,null);}
-function toggleThermostat(){ajax('/SetOutputOn/Thermostat/2/0',null);}
-function setStir(){var v=_numVal('#StirInput','Agitación'); if(v!==null) ajax('/SetOutputTarget/Stir/0/'+v,null);}
-function toggleStir(){ajax('/SetOutputOn/Stir/2/0',null);}
+function measureTemp(w){ajax('/MeasureTemp/'+w+'/'+_selM,null);}
+function setThermostat(){var v=_numVal('#ThermostatInput','Termostato'); if(v!==null) ajax('/SetOutputTarget/Thermostat/'+_selM+'/'+v,null);}
+function toggleThermostat(){ajax('/SetOutputOn/Thermostat/2/'+_selM,null);}
+function setStir(){var v=_numVal('#StirInput','Agitación'); if(v!==null) ajax('/SetOutputTarget/Stir/'+_selM+'/'+v,null);}
+function toggleStir(){ajax('/SetOutputOn/Stir/2/'+_selM,null);}
 var CUSTOM_PROGRAM_CONFIG={
   C1:{label:'GFP objetivo',     min:0, max:1,    step:0.01, unit:''},
   C2:{label:'μ objetivo',  min:0, max:1,    step:0.01, unit:'h⁻¹'},
@@ -825,15 +831,15 @@ function toggleCustom(){
   } else {
     v=0;
   }
-  ajax('/SetCustom/'+prog+'/'+v,null);
+  ajax('/SetCustom/'+prog+'/'+v+'/'+_selM,null);
 }
-function setLED(l){var v=_numVal('#'+l+'Input',l); if(v!==null) ajax('/SetOutputTarget/'+l+'/0/'+v,null);}
+function setLED(l){var v=_numVal('#'+l+'Input',l); if(v!==null) ajax('/SetOutputTarget/'+l+'/'+_selM+'/'+v,null);}
 function adjLED(l,delta){
   var inp=$('#'+l+'Input');
   var v=Math.round((parseFloat(inp.val()||0)+delta)*10)/10;
   v=Math.max(0,Math.min(1,v));
   inp.val(v);
-  ajax('/SetOutputTarget/'+l+'/0/'+v,null);
+  ajax('/SetOutputTarget/'+l+'/'+_selM+'/'+v,null);
 }
 function switchLED(l,on){
   if(window._updatingLED)return;
@@ -841,12 +847,12 @@ function switchLED(l,on){
     var t=document.getElementById(l+'-tog'); if(t) t.checked=false;
     return;
   }
-  ajax('/SetOutputOn/'+l+'/'+(on?1:0)+'/0',null);
+  ajax('/SetOutputOn/'+l+'/'+(on?1:0)+'/'+_selM,null);
 }
 var _pumpDir={Pump1:1,Pump2:1,Pump3:1,Pump4:1};
-function switchPump(p){ajax('/SetOutputOn/'+p+'/2/0',null);}
-function switchPumpToggle(p,on){ajax('/SetOutputOn/'+p+'/'+(on?1:0)+'/0',null);}
-function dirPump(p){ajax('/Direction/'+p+'/0',null);}
+function switchPump(p){ajax('/SetOutputOn/'+p+'/2/'+_selM,null);}
+function switchPumpToggle(p,on){ajax('/SetOutputOn/'+p+'/'+(on?1:0)+'/'+_selM,null);}
+function dirPump(p){ajax('/Direction/'+p+'/'+_selM,null);}
 var _pumpTimer={};
 function setPump(p){
   clearTimeout(_pumpTimer[p]);   // el input dispara por cada tecla: una sola escritura I²C al dejar de teclear
@@ -854,7 +860,7 @@ function setPump(p){
     var raw=parseFloat($('#'+p+'Input').val());
     if(isNaN(raw))return;
     var v=Math.max(-1,Math.min(1,raw));
-    ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+    ajax('/SetOutputTarget/'+p+'/'+_selM+'/'+v,null);
   },250);
 }
 function adjPump(p,delta){
@@ -866,11 +872,11 @@ function adjPump(p,delta){
   mag=Math.max(0,Math.min(1,mag));
   var v=sign*mag;
   inp.val(v.toFixed(1));
-  ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+  ajax('/SetOutputTarget/'+p+'/'+_selM+'/'+v,null);
 }
-function measureSpectrum(){ajax('/GetSpectrum/'+$('#SpectrumGain').val()+'/0',null);}
-function measureFP(){ajax('/MeasureFP/0',null);}
-function toggleFP(fp){var n=fp.slice(2);ajax('/SetFPMeasurement/'+fp+'/'+$('#FPExcite'+n).val()+'/'+$('#FPBase'+n).val()+'/'+$('#FPEmit'+n+'A').val()+'/'+$('#FPEmit'+n+'B').val()+'/'+$('#FPGain'+n).val(),null);}
+function measureSpectrum(){ajax('/GetSpectrum/'+$('#SpectrumGain').val()+'/'+_selM,null);}
+function measureFP(){ajax('/MeasureFP/'+_selM,null);}
+function toggleFP(fp){var n=fp.slice(2);ajax('/SetFPMeasurement/'+fp+'/'+$('#FPExcite'+n).val()+'/'+$('#FPBase'+n).val()+'/'+$('#FPEmit'+n+'A').val()+'/'+$('#FPEmit'+n+'B').val()+'/'+$('#FPGain'+n).val()+'/'+_selM,null);}
 
 function toggleFPCollapse(n){
   var card=document.getElementById('fp-card-'+n);
@@ -911,7 +917,7 @@ function applyFPPreset(n){
   $('#FPEmit'+n+'B').val(p.em2);
 }
 function fpManualEdit(n){$('#FPProtein'+n).val('');} // edición manual rompe preset
-function clearTerm(){ajax('/ClearTerminal/0',null);}
+function clearTerm(){ajax('/ClearTerminal/'+_selM,null);}
 
 /* ── Terminal — render agrupado por ciclo ───────── */
 function renderTerminal(entries){

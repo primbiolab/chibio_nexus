@@ -857,18 +857,20 @@ def index():
 def architect():
     return render_template('architect.html')
 
-@application.route('/getSysdata/')
-def getSysdata():
+@application.route('/getSysdata/', defaults={'M': '0'})
+@application.route('/getSysdata/<M>')
+def getSysdata(M):
     #Similar to function above, packages data to be sent to UI.
     global sysData
     global sysItems
     global _cloud
-    outputdata=sysData[sysItems['UIDevice']]
-    for M in ['M0','M1','M2','M3','M4','M5','M6','M7']:
-            if sysData[M]['present']==1:
-                outputdata['presentDevices'][M]=1
+    M = _resolveM(M)
+    outputdata=sysData[M]
+    for Mx in ['M0','M1','M2','M3','M4','M5','M6','M7']:
+            if sysData[Mx]['present']==1:
+                outputdata['presentDevices'][Mx]=1
             else:
-                outputdata['presentDevices'][M]=0
+                outputdata['presentDevices'][Mx]=0
     outputdata['cloud'] = {
         'status'       : _cloud['status'],
         'error_msg'    : _cloud['error_msg'],
@@ -889,6 +891,8 @@ def getSysdata():
             time.sleep(0.02)
     if snapshot is None:
         snapshot = copy.deepcopy(outputdata)  # último intento; si falla, propaga a 500
+    # Reactor de ESTA respuesta (no el flag global): cada pestaña pide su propio M.
+    snapshot['UIDevice'] = M
     return jsonify(snapshot)
 
 @application.route('/getCloudStatus/')
@@ -969,8 +973,9 @@ def clearTerminal(M):
     
 
 
-@application.route("/SetFPMeasurement/<item>/<Excite>/<Base>/<Emit1>/<Emit2>/<Gain>",methods=['POST'])
-def SetFPMeasurement(item,Excite,Base,Emit1,Emit2,Gain):
+@application.route("/SetFPMeasurement/<item>/<Excite>/<Base>/<Emit1>/<Emit2>/<Gain>", defaults={'M': '0'}, methods=['POST'])
+@application.route("/SetFPMeasurement/<item>/<Excite>/<Base>/<Emit1>/<Emit2>/<Gain>/<M>",methods=['POST'])
+def SetFPMeasurement(item,Excite,Base,Emit1,Emit2,Gain,M):
     #Sets up the fluorescent protein measurement in terms of gain, and which LED / measurement bands to use.
     FP=str(item)
     Excite=str(Excite)
@@ -978,7 +983,7 @@ def SetFPMeasurement(item,Excite,Base,Emit1,Emit2,Gain):
     Emit1=str(Emit1)
     Emit2=str(Emit2)
     Gain=str(Gain)
-    M=sysItems['UIDevice']
+    M=_resolveM(M)
     
     if sysData[M][FP]['ON']==1:
         sysData[M][FP]['ON']=0
@@ -1577,12 +1582,13 @@ def GetTransmission(M,item,wavelengths,Gain,ISteps):
 
 
 
-@application.route("/SetCustom/<Program>/<Status>",methods=['POST'])
-def SetCustom(Program,Status):
+@application.route("/SetCustom/<Program>/<Status>", defaults={'M': '0'}, methods=['POST'])
+@application.route("/SetCustom/<Program>/<Status>/<M>",methods=['POST'])
+def SetCustom(Program,Status,M):
     #Turns a custom program on/off.
-	
+
     global sysData
-    M=sysItems['UIDevice']
+    M=_resolveM(M)
     item="Custom"
     if sysData[M][item]['ON']==1:
         sysData[M][item]['ON']=0
@@ -2519,11 +2525,12 @@ def Zigzag(M):
 
 
 
-@application.route("/ExperimentReset",methods=['POST'])
-def ExperimentReset():
+@application.route("/ExperimentReset", defaults={'M': '0'}, methods=['POST'])
+@application.route("/ExperimentReset/<M>",methods=['POST'])
+def ExperimentReset(M):
     #Resets parameters/values of a given experiment.
-    initialise(sysItems['UIDevice'])
-    return ('', 204)   
+    initialise(_resolveM(M))
+    return ('', 204)
 
 @application.route("/Experiment/<value>/<M>",methods=['POST'])
 def ExperimentStartStop(M,value):

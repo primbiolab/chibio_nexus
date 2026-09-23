@@ -63,6 +63,10 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 _start_time = time.time()
 _ui_device  = 'M0'
 
+def _resolveM(M):
+    # Espejo de app.py: '0' = "lo que la pestaña tenga seleccionado" (compat, sin M explícito).
+    return _ui_device if M == '0' else M
+
 _cloud = {
     'status'       : 'idle',
     'error_msg'    : '',
@@ -428,10 +432,10 @@ def index():
 def architect():
     return render_template('architect.html')
 
-@app.route('/getSysdata/')
-def getSysdata():
-    global _ui_device
-    return jsonify(_build_sysdata(_ui_device))
+@app.route('/getSysdata/', defaults={'M': '0'})
+@app.route('/getSysdata/<M>')
+def getSysdata(M):
+    return jsonify(_build_sysdata(_resolveM(M)))
 
 @app.route('/getCloudStatus/')
 def getCloudStatus():
@@ -455,24 +459,27 @@ def scanDevices(which):
     print(f'[MOCK] Escaneo solicitado: {which}')
     return ('', 204)
 
-@app.route('/Experiment/<int:on>/<int:M>', methods=['POST'])
+@app.route('/Experiment/<int:on>/<M>', methods=['POST'])
 def experiment(on, M):
-    global _REACTOR_CFG, _REACTOR_MUT, _ui_device
-    _REACTOR_CFG[_ui_device]['running'] = bool(on)
+    global _REACTOR_CFG, _REACTOR_MUT
+    M = _resolveM(M)
+    _REACTOR_CFG[M]['running'] = bool(on)
     # Limpiar overrides de ON para que los actuadores reflejen el nuevo estado del experimento
-    for key in list(_REACTOR_MUT.get(_ui_device, {}).keys()):
-        _REACTOR_MUT[_ui_device][key].pop('ON', None)
-    print(f'[MOCK] Experimento {"INICIADO" if on else "DETENIDO"} en {_ui_device}')
+    for key in list(_REACTOR_MUT.get(M, {}).keys()):
+        _REACTOR_MUT[M][key].pop('ON', None)
+    print(f'[MOCK] Experimento {"INICIADO" if on else "DETENIDO"} en {M}')
     return ('', 204)
 
-@app.route('/ExperimentReset', methods=['POST'])
-def experimentReset():
-    global _start_time, _REACTOR_CFG, _REACTOR_MUT, _ui_device
+@app.route('/ExperimentReset', defaults={'M': '0'}, methods=['POST'])
+@app.route('/ExperimentReset/<M>', methods=['POST'])
+def experimentReset(M):
+    global _start_time, _REACTOR_CFG, _REACTOR_MUT
+    M = _resolveM(M)
     _start_time = time.time()
-    _REACTOR_CFG[_ui_device]['running'] = False
-    _REACTOR_CFG[_ui_device]['fsm']     = 0.0
-    _REACTOR_MUT[_ui_device] = {}
-    print(f'[MOCK] Experimento RESET en {_ui_device}')
+    _REACTOR_CFG[M]['running'] = False
+    _REACTOR_CFG[M]['fsm']     = 0.0
+    _REACTOR_MUT[M] = {}
+    print(f'[MOCK] Experimento RESET en {M}')
     return ('', 204)
 
 # Endpoints especializados — simulan cambio de estado visible en sysData
@@ -506,42 +513,46 @@ def measureFP(M):
     return ('', 204)
 
 # Endpoints de control — mutan _REACTOR_MUT y responden 204
-@app.route('/SetOutputTarget/<param>/<a>/<val>', methods=['POST'])
-def setOutputTarget(param, a, val):
+@app.route('/SetOutputTarget/<param>/<M>/<val>', methods=['POST'])
+def setOutputTarget(param, M, val):
     global _REACTOR_MUT, _REACTOR_CFG
+    M = _resolveM(M)
     try:
         fval = float(val)
     except ValueError:
         return ('', 204)
-    mut = _REACTOR_MUT.setdefault(_ui_device, {}).setdefault(param, {})
+    mut = _REACTOR_MUT.setdefault(M, {}).setdefault(param, {})
     mut['target'] = fval
     # Propagar a cfg para que la simulación siga el nuevo target
     if param == 'OD':
-        _REACTOR_CFG[_ui_device]['od_base'] = fval
+        _REACTOR_CFG[M]['od_base'] = fval
     elif param == 'Thermostat':
-        _REACTOR_CFG[_ui_device]['temp_base'] = fval
+        _REACTOR_CFG[M]['temp_base'] = fval
     elif param == 'Stir':
-        _REACTOR_CFG[_ui_device]['stir'] = fval
+        _REACTOR_CFG[M]['stir'] = fval
     elif param == 'Pump1':
-        _REACTOR_CFG[_ui_device]['pump1'] = fval
-    print(f'[MOCK] SetOutputTarget {param}={fval} en {_ui_device}')
+        _REACTOR_CFG[M]['pump1'] = fval
+    print(f'[MOCK] SetOutputTarget {param}={fval} en {M}')
     return ('', 204)
 
-@app.route('/SetOutputOn/<param>/<a>/<b>', methods=['POST'])
-def setOutputOn(param, a, b):
-    mut = _REACTOR_MUT.setdefault(_ui_device, {}).setdefault(param, {})
+@app.route('/SetOutputOn/<param>/<force>/<M>', methods=['POST'])
+def setOutputOn(param, force, M):
+    M = _resolveM(M)
+    mut = _REACTOR_MUT.setdefault(M, {}).setdefault(param, {})
     if 'ON' not in mut:
-        base_on = _build_sysdata(_ui_device).get(param, {}).get('ON', 0)
+        base_on = _build_sysdata(M).get(param, {}).get('ON', 0)
         mut['ON'] = 0 if base_on else 1
     else:
         mut['ON'] = 0 if mut['ON'] else 1
-    print(f'[MOCK] SetOutputOn {param} -> ON={mut["ON"]} en {_ui_device}')
+    print(f'[MOCK] SetOutputOn {param} -> ON={mut["ON"]} en {M}')
     return ('', 204)
 
-@app.route('/SetCustom/<prog>/<state>', methods=['POST'])
-def setCustom(prog, state):
-    mut = _REACTOR_MUT.setdefault(_ui_device, {}).setdefault('Custom', {})
-    cfg_running = _REACTOR_CFG[_ui_device]['running']
+@app.route('/SetCustom/<prog>/<state>', defaults={'M': '0'}, methods=['POST'])
+@app.route('/SetCustom/<prog>/<state>/<M>', methods=['POST'])
+def setCustom(prog, state, M):
+    M = _resolveM(M)
+    mut = _REACTOR_MUT.setdefault(M, {}).setdefault('Custom', {})
+    cfg_running = _REACTOR_CFG[M]['running']
     currently_on = mut.get('ON', 1 if cfg_running else 0)
     if currently_on:
         mut['ON'] = 0
@@ -552,7 +563,7 @@ def setCustom(prog, state):
             mut['Status'] = float(state)
         except ValueError:
             mut['Status'] = 0.0
-    print(f'[MOCK] SetCustom {prog} state={state} -> ON={mut["ON"]} en {_ui_device}')
+    print(f'[MOCK] SetCustom {prog} state={state} -> ON={mut["ON"]} en {M}')
     return ('', 204)
 
 # Endpoints sin efecto en estado — solo log
