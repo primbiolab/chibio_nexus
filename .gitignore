@@ -37,12 +37,17 @@ CLAUDE.md
 AGENTS.md
 CAMERA_SERVER_EXPANSION_PLAN.md
 reglas.md
+configuracion_cloudflare.md
+docs/
 
 # ── Agentes/herramientas IA (cache local, no codigo del proyecto) ─
 .agents/
 .claude/
 graphify-out/
 .pytest_cache/
+
+# ── Tests (herramienta de desarrollo, no se publica) ──────────
+tests/
 
 # ── Node (solo si algun script usa npm/node localmente) ────────
 node_modules/
