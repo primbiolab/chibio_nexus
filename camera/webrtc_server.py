@@ -9,13 +9,14 @@ Stack: FastAPI + aiortc + H.264 (con bitrate elevado).
 
 Uso:
     pip install -r requirements-windows.txt
-    python -m uvicorn camera.webrtc_server:app --host 0.0.0.0 --port 8000
+    python -m uvicorn camera.webrtc_server:app --host 127.0.0.1 --port 8000
 """
 
 import asyncio
 import json
 import logging
 import re
+import socket
 import time
 import traceback
 import uuid
@@ -64,11 +65,38 @@ try:
 except Exception as _e:
     log.warning("No se pudo elevar MAX_BITRATE VP8 de aiortc: %s", _e)
 
+# aioice espera 5 s por cada interfaz local que acepta bind pero no tiene ruta (host-only de VirtualBox,
+# VPN caída): cada espectador tardaba +5 s en recibir el answer. Se descartan las IPv4 sin ruta;
+# si ninguna pasa (PC sin salida a internet) se conservan todas para no dejar sin candidatos a la LAN.
+def _filter_reachable_hosts(addrs, probe):
+    ok = [a for a in addrs if probe(a)]
+    return ok or list(addrs)
+
+
+def _has_route(addr):
+    if ":" in addr:
+        return True
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.bind((addr, 0))
+            s.connect(("8.8.8.8", 9))   # UDP connect solo consulta la tabla de rutas: no envía nada
+        return True
+    except OSError:
+        return False
+
+
+try:
+    from aioice import ice as _ice
+    _orig_host_addresses = _ice.get_host_addresses
+    _ice.get_host_addresses = lambda *a, **k: _filter_reachable_hosts(_orig_host_addresses(*a, **k), _has_route)
+except Exception as _e:
+    log.warning("No se pudo filtrar las interfaces sin ruta de aioice: %s", _e)
+
 # ─────────────────────────────────────────────
 # Configuración
 # ─────────────────────────────────────────────
 
-CAMERA_INDEX   = 0       # índice de cámara (0 = default)
+CAMERA_INDEX  = 0       # índice de cámara (0 = default)
 TARGET_FPS     = 30      # FPS deseados (ajustar según capacidad de la cámara)
 FRAME_WIDTH    = 1280    # resolución ancho
 FRAME_HEIGHT   = 720     # resolución alto (16:9 nativo, soportado por casi todas las webcams a 60fps)
@@ -76,6 +104,7 @@ BUFFER_SIZE    = 1       # ring buffer size: 1 = siempre el frame más fresco
 MAX_PEERS      = 8       # máximo de clientes WebRTC simultáneos
 MAX_PEERS_PER_IP = 2     # máximo de peers por IP (evita que un cliente monopolice)
 CAPTURE_MAX_FAILURES = 50  # reintentos antes de reinicializar la cámara
+FRAME_STALE_SECONDS = 3.0  # sin frames durante este tiempo → /health 'down' y /frame 503
 
 # Orígenes permitidos para CORS. El polling /health del Nexus es cross-origin
 # (Nexus en chibio.primbiolab.org → cámara en camera.primbiolab.org).
@@ -83,6 +112,8 @@ ALLOWED_ORIGINS = [
     "https://chibio.primbiolab.org",
     "http://localhost:5000",
     "http://127.0.0.1:5000",
+    "http://127.0.0.1:8000",   # /preview (visor propio) abre el WS con este Origin
+    "http://localhost:8000",
 ]
 
 # Servidores STUN/TURN para traversal de NAT
@@ -158,6 +189,7 @@ class CameraCapture:
         self._frame_count = 0
         self._last_stats  = time.monotonic()
         self.actual_fps   = 0.0
+        self.last_frame_t = 0.0   # monotonic del último frame entregado
 
     def _init_capture(self) -> cv2.VideoCapture:
         cap = cv2.VideoCapture(self.index, cv2.CAP_V4L2)  # Linux: V4L2 nativo
@@ -182,7 +214,11 @@ class CameraCapture:
         fail_count = 0
 
         while self._running:
-            ret, frame = await loop.run_in_executor(None, self._cap.read)
+            try:
+                ret, frame = await loop.run_in_executor(None, self._cap.read)
+            except Exception as e:   # sin esto una excepción mata la tarea y el FPS queda congelado
+                log.warning(f"Error leyendo la cámara: {e}")
+                ret, frame = False, None
             if not ret:
                 fail_count += 1
                 backoff = min(0.1 * fail_count, 2.0)
@@ -198,6 +234,7 @@ class CameraCapture:
 
             fail_count = 0
             await self.buffer.put(frame)
+            self.last_frame_t = time.monotonic()
             self._frame_count += 1
 
             # Calcular FPS real cada 2 segundos
@@ -295,13 +332,41 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mitigación: en el servicio real, con espectadores simultáneos, algún pc llegaba a 'closed' sin que el finally
+# del WS ni on_state_change lo sacaran de peer_connections (sin 'Limpieza completada' en el log): el slot
+# quedaba ocupado para siempre. Causa raíz sin identificar; este barrido libera el slot y deja rastro en el log.
+async def _reap_dead_peers():
+    for client_id, pc in list(peer_connections.items()):
+        if pc.connectionState in ("closed", "failed"):
+            peer_connections.pop(client_id, None)
+            peer_ips.pop(client_id, None)
+            log.warning(f"[{client_id}] Peer {pc.connectionState} sin limpiar: liberado por el barrido")
+            try:
+                await asyncio.wait_for(pc.close(), 5)
+            except Exception as e:
+                log.warning(f"[{client_id}] close() del barrido falló: {e!r}")
+
+
+async def _reap_loop():
+    while True:
+        await asyncio.sleep(10)
+        await _reap_dead_peers()
+
+
+_reap_task = None
+
+
 @app.on_event("startup")
 async def startup():
+    global _reap_task
     camera.start()
+    _reap_task = asyncio.ensure_future(_reap_loop())
     log.info("Servidor listo")
 
 @app.on_event("shutdown")
 async def shutdown():
+    if _reap_task:
+        _reap_task.cancel()
     camera.stop()
     for pc in list(peer_connections.values()):
         await pc.close()
@@ -500,7 +565,7 @@ async def preview():
 async def get_frame():
     """Último frame capturado como JPEG. Útil para previews sin WebRTC."""
     frame = camera.buffer.latest()
-    if frame is None:
+    if frame is None or not _camera_fresh():
         return Response(status_code=503)
     ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
     if not ok:
@@ -508,9 +573,13 @@ async def get_frame():
     return Response(content=buf.tobytes(), media_type="image/jpeg")
 
 
+def _camera_fresh() -> bool:
+    return time.monotonic() - camera.last_frame_t < FRAME_STALE_SECONDS
+
+
 @app.get("/health")
 async def health():
-    fps = round(camera.actual_fps, 1)
+    fps = round(camera.actual_fps, 1) if _camera_fresh() else 0.0
     if fps == 0.0:
         status = "down"
     elif fps < TARGET_FPS * 0.5:
@@ -532,7 +601,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         app,
-        host="0.0.0.0",
+        host="127.0.0.1",   # sin auth: solo loopback (cloudflared y el panel usan 127.0.0.1)
         port=8000,
         # SSL local deshabilitado: Cloudflare Tunnel maneja TLS externamente
         # ssl_keyfile="certs/key.pem",

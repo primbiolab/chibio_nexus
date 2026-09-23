@@ -12,6 +12,12 @@
 #   .\compilar.ps1
 
 $root = $PSScriptRoot
+
+# Un .exe congela LOCAL_HOST: no compilar si quedo apuntando al mock (127.0.0.1) u otra IP.
+if (-not (Select-String -Path "$root\lanzador_real.py" -Pattern '^LOCAL_HOST = "192\.168\.7\.2"' -Quiet)) {
+    Write-Error 'LOCAL_HOST en lanzador_real.py no es 192.168.7.2 (BBB real). Reviertelo antes de compilar.'
+    exit 1
+}
 $iconLegacy = "$root\assets\nexus.ico"
 $iconBlanco = "$root\assets\logo_blanco.ico"
 

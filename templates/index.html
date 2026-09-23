@@ -5,7 +5,8 @@
 (function(){
   var ua = navigator.userAgent || '';
   var mobileUA = /Mobile|Android|iPhone|webOS|BlackBerry/i.test(ua);
-  if(mobileUA || screen.width < 1024){
+  var touchSmall = window.matchMedia && matchMedia('(pointer: coarse)').matches && screen.width < 1024;  // escritorio a 200 % reporta screen.width=960
+  if(mobileUA || touchSmall){
     window.location.href = '/mobile-blocked';
   }
 })();

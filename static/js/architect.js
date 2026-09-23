@@ -152,6 +152,36 @@ function cloneNodeDeep(n) {
     return c;
 }
 
+// ── Saneado de datos externos (import .chibio, postMessage, Gemini) ──
+// type/enums/números llegan a innerHTML y a compileFSM: solo se conservan valores conocidos.
+function _sanitizeImportedAST(list) {
+  const NUM = ['duration','power','temp','temp_start','temp_end','val','od','speed','p1','p2','zig','count'];
+  const ENUM = {   // campo → [valores válidos, valor por defecto seguro]
+    led: [['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI','LEDV'], 'LEDB'],
+    pump: [['Pump1','Pump2','Pump3','Pump4'], 'Pump1'],
+    unit: [['sec','min','gen'], 'min'], mode: [['on','off','pulse'], 'off'], state: [['on','off'], 'on'],
+    tvar: [['OD','GrowthRate','Temp','FP1','FP2','FP3','Generations'], 'OD'],
+    op: [['>','<','>=','<=','=='], '>='], behavior: [['wait','if'], 'wait'],
+  };
+  const out = [];
+  (Array.isArray(list) ? list : []).forEach(function(n) {
+    if (!n || typeof n !== 'object' || !Object.prototype.hasOwnProperty.call(META, n.type)) return;
+    const c = { type: n.type };
+    if (typeof n.id === 'string' && /^n\d+$/.test(n.id)) c.id = n.id;
+    NUM.forEach(function(k){ if (n[k] !== undefined) { const v = Number(n[k]); c[k] = isFinite(v) ? v : 0; } });
+    Object.keys(ENUM).forEach(function(k){ if (n[k] !== undefined) c[k] = ENUM[k][0].indexOf(n[k]) !== -1 ? n[k] : ENUM[k][1]; });
+    if (n.msg !== undefined) c.msg = String(n.msg).slice(0, 200);
+    if (n.type === 'loop' || n.type === 'trigger') c.children = _sanitizeImportedAST(n.children);
+    out.push(c);
+  });
+  return out;
+}
+function _sanitizeImportedPumps(p) {
+  const out = {};
+  ['Pump1','Pump2','Pump3','Pump4'].forEach(function(k){ const v = Number(p && p[k]); out[k] = isFinite(v) && v > 0 ? v : 1.0; });
+  return out;
+}
+
 // ── AST helpers ───────────────────────────────────────────
 function findNode(id, arr){
   arr=arr||AST;
@@ -777,15 +807,30 @@ function compileFSM(nodes, M, progName) {
     function allocateState() { return ++sc; }
     function write(state, lines) { if(!states[state]) states[state]=[]; if(Array.isArray(lines)) states[state].push(...lines); else states[state].push(lines); }
 
-    function processNodes(nodeList, entryState, exitState) {
+    const _MODES = ['turbidostat','chemostat','zigzag'];
+    function modeLines(n) {
+        const on = n.state === 'on';
+        if (n.type === 'turbidostat') return [
+            `SetOutputOn(M, 'OD', ${on?1:0})`,
+            `addTerminal(M, 'Turbidostato ${on?'activado':'desactivado'}')`];
+        if (n.type === 'chemostat') return [
+            `sysData[M]['Chemostat']['ON'] = ${on?1:0}`, `sysData[M]['Chemostat']['p1'] = ${n.p1}`, `sysData[M]['Chemostat']['p2'] = ${n.p2}`,
+            `addTerminal(M, 'Quimiostato ${on?'activado':'desactivado'} — P1=${n.p1}, P2=${n.p2}')`];
+        const L = [`SetOutputOn(M, 'Zigzag', ${on?1:0})`, `sysData[M]['Zigzag']['Zig'] = ${n.zig}`];
+        if (on) L.push(`SetOutputOn(M, 'OD', 1)  # Zigzag requiere Turbidostato`);
+        L.push(`addTerminal(M, 'Zigzag ${on?'activado':'desactivado'} — amplitud OD: ${n.zig}')`);
+        return L;
+    }
+
+    function processNodes(nodeList, entryState, exitState, nested) {
         let curr = entryState;
+        // init_* y, en la raíz, los modos de control se aplican en el estado 0: no ocupan estado.
+        // Filtrar antes de indexar evita que un nodo ignorado al final deje sin cerrar el último estado.
+        nodeList = nodeList.filter(n => !['init_temp','init_od','init_stir'].includes(n.type) && (nested || !_MODES.includes(n.type)));
         if (nodeList.length === 0) { write(entryState, `sysData[M]['Custom']['Status'] = ${exitState}.0`); return; }
-        
+
         for(let i=0; i<nodeList.length; i++) {
             const n = nodeList[i];
-            
-            // Initializers (Ignorados aquí, se procesan en 0.0)
-            if (['init_temp','init_od','init_stir','turbidostat','chemostat','zigzag'].includes(n.type)) continue;
 
             if (n.type === 'wait' && n.unit === 'min') {
                 let waitState = allocateState();
@@ -841,9 +886,15 @@ function compileFSM(nodes, M, progName) {
                 curr = next;
             }
             else if (n.type === 'trigger') {
-                let bodyEntry = n.children.length > 0 ? allocateState() : ((i === nodeList.length - 1) ? exitState : allocateState());
                 let nextState = (i === nodeList.length - 1) ? exitState : allocateState();
-                
+                let bodyEntry = n.children.length > 0 ? allocateState() : nextState;
+                if (n.behavior === 'wait' && states[curr] && states[curr].length) {
+                    // "Esperar" reevalúa su estado cada ciclo: aislarlo para no repetir los bloques síncronos previos.
+                    const gate = allocateState();
+                    write(curr, `sysData[M]['Custom']['Status'] = ${gate}.0`);
+                    curr = gate;
+                }
+
                 const vmap={OD:"sysData[M]['OD']['current']",GrowthRate:"sysData[M]['GrowthRate']['current']",Temp:"sysData[M]['ThermometerIR']['current']",FP1:"sysData[M]['FP1']['Emit1']",FP2:"sysData[M]['FP2']['Emit1']",FP3:"sysData[M]['FP3']['Emit1']",Generations:"sysData[M]['Custom'].get('Generations', 0.0)"};
                 const safeOp = ['>','<','>=','<=','=='].includes(n.op) ? n.op : '>';
                 let cond = `${vmap[n.tvar] || "sysData[M]['OD']['current']"} ${safeOp} ${n.val}`;
@@ -854,7 +905,7 @@ function compileFSM(nodes, M, progName) {
                     write(curr, `if ${cond}:`); write(curr, `    sysData[M]['Custom']['Status'] = ${bodyEntry}.0`);
                     write(curr, `else:`); write(curr, `    sysData[M]['Custom']['Status'] = ${nextState}.0`);
                 }
-                if (n.children.length > 0) processNodes(n.children, bodyEntry, nextState);
+                if (n.children.length > 0) processNodes(n.children, bodyEntry, nextState, true);
                 curr = nextState;
             }
             else if (n.type === 'loop') {
@@ -862,7 +913,7 @@ function compileFSM(nodes, M, progName) {
                 write(curr, `addTerminal(M, 'Bucle iniciado: ${n.count} iteraciones')`);
                 write(curr, `sysData[M]['Custom']['${loopVar}'] = 0`); write(curr, `sysData[M]['Custom']['Status'] = ${bodyEntry}.0`);
                 let bodyExit = allocateState();
-                if (n.children.length > 0) processNodes(n.children, bodyEntry, bodyExit); else write(bodyEntry, `sysData[M]['Custom']['Status'] = ${bodyExit}.0`);
+                if (n.children.length > 0) processNodes(n.children, bodyEntry, bodyExit, true); else write(bodyEntry, `sysData[M]['Custom']['Status'] = ${bodyExit}.0`);
 
                 write(bodyExit, `sysData[M]['Custom']['${loopVar}'] += 1`);
                 write(bodyExit, `addTerminal(M, f"Iteracion {int(sysData[M]['Custom']['${loopVar}'])} / ${n.count}")`);
@@ -911,7 +962,8 @@ function compileFSM(nodes, M, progName) {
                     write(curr, `addTerminal(M, 'Espera: ${n.duration}s')`);
                     write(curr, `time.sleep(${n.duration})`);
                 }
-                else if (n.type === 'log') { write(curr, `addTerminal(M, '${n.msg.replace(/'/g,"\\'")}')`); }
+                else if (_MODES.includes(n.type)) { modeLines(n).forEach(l => write(curr, l)); }
+                else if (n.type === 'log') { write(curr, `addTerminal(M, ${JSON.stringify(String(n.msg == null ? '' : n.msg))})`); }
 
                 if (i === nodeList.length - 1 && curr !== exitState) write(curr, `sysData[M]['Custom']['Status'] = ${exitState}.0`);
             }
@@ -929,11 +981,10 @@ function compileFSM(nodes, M, progName) {
 
     if(usesGenerations) {
         L.push(`        # --- MOTOR DE GENERACIONES BIOLÓGICAS ---`);
-        L.push(`        if 'Generations' not in sysData[M]['Custom']:`);
-        L.push(`            sysData[M]['Custom']['Generations'] = 0.0`);
+        // Sin `in`/`not in`: el validador AST del servidor no permite ast.In/NotIn (rechazaba todo protocolo con generaciones).
         L.push(`        _gr = sysData[M]['GrowthRate']['current']`);
         L.push(`        if _gr > 0:`);
-        L.push(`            sysData[M]['Custom']['Generations'] += max(0, (_gr / 0.693147) / 60.0)`);
+        L.push(`            sysData[M]['Custom']['Generations'] = sysData[M]['Custom'].get('Generations', 0.0) + max(0, (_gr / 0.693147) / 60.0)`);
         L.push(``);
     }
 
@@ -955,18 +1006,7 @@ function compileFSM(nodes, M, progName) {
             L.push(`            sysData[M]['Stir']['target'] = ${n.speed}`); L.push(`            SetOutputOn(M, 'Stir', 1)`);
             L.push(`            addTerminal(M, 'Agitacion: ${Math.round(n.speed*100)}% de potencia')`);
         }
-        if(n.type==='turbidostat'){
-            L.push(`            SetOutputOn(M, 'OD', ${n.state==='on'?1:0})`);
-            L.push(`            addTerminal(M, 'Turbidostato ${n.state==='on'?'activado':'desactivado'}')`);
-        }
-        if(n.type==='chemostat'){
-            L.push(`            sysData[M]['Chemostat']['ON'] = ${n.state==='on'?1:0}`); L.push(`            sysData[M]['Chemostat']['p1'] = ${n.p1}`); L.push(`            sysData[M]['Chemostat']['p2'] = ${n.p2}`);
-            L.push(`            addTerminal(M, 'Quimiostato ${n.state==='on'?'activado':'desactivado'} — P1=${n.p1}, P2=${n.p2}')`);
-        }
-        if(n.type==='zigzag'){
-            L.push(`            SetOutputOn(M, 'Zigzag', ${n.state==='on'?1:0})`); L.push(`            sysData[M]['Zigzag']['Zig'] = ${n.zig}`); if(n.state === 'on'){ L.push(`            SetOutputOn(M, 'OD', 1)  # Zigzag requiere Turbidostato`); }
-            L.push(`            addTerminal(M, 'Zigzag ${n.state==='on'?'activado':'desactivado'} — amplitud OD: ${n.zig}')`);
-        }
+        if(_MODES.includes(n.type)) modeLines(n).forEach(l => L.push(`            ${l}`));
     });
 
     L.push(`            sysData[M]['Custom']['Status'] = 1.0`);
@@ -1062,9 +1102,10 @@ function importExperiment(event){
       function reassignIds(arr){
         for(const n of arr){ n.id = uid(); if(n.children) reassignIds(n.children); }
       }
-      reassignIds(data.ast);
-      data.ast.forEach(n => AST.push(n));
-      if(data.pumps) Object.assign(globalPumps, data.pumps);
+      const cleanAst = _sanitizeImportedAST(data.ast);
+      reassignIds(cleanAst);
+      cleanAst.forEach(n => AST.push(n));
+      if(data.pumps) Object.assign(globalPumps, _sanitizeImportedPumps(data.pumps));
       if(data.initialVol !== undefined) globalInitVol = Math.min(20, Math.max(0, data.initialVol));
 
       // Restore reactor if saved (program slot is always C8)
@@ -1210,13 +1251,15 @@ async function triggerAIGeneration() {
         }
         assignIds(generatedNodes);
         generatedNodes.forEach(sanitizeAINode);
+        const cleanNodes = _sanitizeImportedAST(generatedNodes);
+        if (cleanNodes.length === 0) throw new Error("La IA no devolvió bloques válidos.");
 
         _historySave();
-        generatedNodes.forEach(node => AST.push(node));
+        cleanNodes.forEach(node => AST.push(node));
         refresh();
 
         toast("¡Magia aplicada! Bloques generados ✨", "ok");
-        addMsg("ok", "✨", `La IA transformó tu texto en ${generatedNodes.length} bloques.`);
+        addMsg("ok", "✨", `La IA transformó tu texto en ${cleanNodes.length} bloques.`);
         inputEl.value = "";
 
     } catch (error) {
@@ -1605,9 +1648,10 @@ window.addEventListener('message', function(e){
           const data = JSON.parse(e.data.val);
           AST.length = 0; nodeCounter = 0;
           function reassignIds(arr){ for(const n of arr){ n.id = uid(); if(n.children) reassignIds(n.children); } }
-          reassignIds(data.ast);
-          data.ast.forEach(n => AST.push(n));
-          if(data.pumps) Object.assign(globalPumps, data.pumps);
+          const cleanAst = _sanitizeImportedAST(data.ast);
+          reassignIds(cleanAst);
+          cleanAst.forEach(n => AST.push(n));
+          if(data.pumps) Object.assign(globalPumps, _sanitizeImportedPumps(data.pumps));
           if(data.initialVol !== undefined) globalInitVol = Math.min(20, Math.max(0, data.initialVol));
           if(data.reactor) { document.getElementById('dev-sel').value = data.reactor; document.getElementById('dev-badge').textContent = data.reactor; }
           refresh();

@@ -2,11 +2,13 @@
 
 #Import required python packages
 import os
+import sys
 import ast
 import random
 import time
 import math
-from flask import Flask, render_template, jsonify, request
+import functools
+from flask import Flask, render_template, jsonify, request, has_request_context
 from threading import Thread, Lock
 import threading
 import numpy as np
@@ -47,7 +49,8 @@ def add_security_headers(response):
         "default-src 'self'; "
         "script-src 'self' https://ajax.googleapis.com https://www.gstatic.com "
         "https://cdnjs.cloudflare.com 'unsafe-inline'; "
-        "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com 'unsafe-inline'; "
+        "style-src 'self' https://fonts.googleapis.com https://www.gstatic.com "
+        "https://cdnjs.cloudflare.com 'unsafe-inline'; "
         "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data:; "
         "connect-src 'self' https://camera.primbiolab.org wss://camera.primbiolab.org; "
@@ -90,8 +93,10 @@ def validate_path_params():
     for key in ('Status', 'value', 'value2'):
         if key in args:
             try:
-                float(args[key])
+                v = float(args[key])
             except ValueError:
+                return jsonify({'error': key + ' inválido'}), 400
+            if not math.isfinite(v):  # 'nan' pasa los clamps (nan<min es False) y 'inf' es basura
                 return jsonify({'error': key + ' inválido'}), 400
 
 lock=Lock()
@@ -206,10 +211,10 @@ sysDevices = {'M0' : {
     'DAC' : {'device' : 0},
     'Pumps' : {'device' : 0,'startup' : 0, 'frequency' : 0},
     'PWM' : {'device' : 0,'startup' : 0, 'frequency' : 0},
-    'Pump1' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump2' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump3' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
-    'Pump4' : {'thread' : 0,'threadCount' : 0, 'active' : 0},
+    'Pump1' : {'thread' : 0,'threadCount' : 0},
+    'Pump2' : {'thread' : 0,'threadCount' : 0},
+    'Pump3' : {'thread' : 0,'threadCount' : 0},
+    'Pump4' : {'thread' : 0,'threadCount' : 0},
     'Experiment' : {'thread' : 0},
     'Thermostat' : {'thread' : 0,'threadCount' : 0},
     
@@ -283,6 +288,19 @@ def _resolveM(M):
     M = str(M)
     return sysItems['UIDevice'] if M == "0" else M
 
+def _needs_present(fn):
+    # I2CCom hace os._exit(4) si el reactor no está presente (fallo seguro ante bug de software).
+    # Los endpoints que tocan I2C deben responder 409 en vez de tumbar el proceso de los 8 reactores.
+    # El 409 solo existe dentro de una petición HTTP: en hilos (Thermostat, runExperiment, CustomProgram)
+    # jsonify lanzaría RuntimeError y el hilo moriría en silencio con el calefactor en su último PWM;
+    # ahí se deja actuar a I2CCom, cuyo os._exit es el fallo seguro.
+    @functools.wraps(fn)
+    def wrapper(M, *a, **k):
+        if has_request_context() and sysData[_resolveM(M)]['present'] == 0:
+            return jsonify({'error': 'Reactor ausente'}), 409
+        return fn(M, *a, **k)
+    return wrapper
+
 _VALID_M = frozenset({'M0','M1','M2','M3','M4','M5','M6','M7'})
 _VALID_PROGRAMS = frozenset({'C1','C2','C3','C4','C5','C6','C7','C8'})
 # Q7: salidas cuyo actuado es un set-PWM directo (target*ON), sin lógica especial.
@@ -351,6 +369,9 @@ _ALLOWED_AST_NODES = (
     ast.Eq, ast.NotEq, ast.Lt, ast.LtE, ast.Gt, ast.GtE, ast.And, ast.Or, ast.Not,
     ast.keyword,
 )
+# Python 3.7 (BeagleBone) no genera ast.Constant: emite Num/Str/NameConstant (3.8+ los unifica y 3.14 los elimina).
+_LEGACY_CONST = (ast.Num, ast.Str, ast.NameConstant) if sys.version_info < (3, 8) else ()
+_ALLOWED_AST_NODES += _LEGACY_CONST
 _ALLOWED_CALLS = {
     'SetOutputOn', 'SetOutputTarget', 'MeasureOD', 'MeasureTemp', 'MeasureFP',
     'addTerminal', 'RegulateOD',
@@ -364,12 +385,39 @@ _DENIED_NAMES = {
     'super', 'property',
 }
 
+# Nombres que el protocolo NO puede reasignar: si pudiera hacer `str = '{0.__globals__}'.format`
+# obtendría un alias de una función permitida apuntando a otra cosa y saltaría la allowlist de llamadas.
+_PROTECTED_NAMES = _ALLOWED_CALLS | _DENIED_NAMES | {'sysData', 'M', 'program', 'time', 'math', 'datetime'}
+_SEQUENCE_NODES = (ast.List, ast.Tuple, ast.JoinedStr)
+
+def _str_literal(node):
+    # Valor de un literal de texto, o None si el nodo no lo es: ast.Constant (3.8+) o ast.Str (3.7).
+    if isinstance(node, ast.Constant):
+        value = node.value
+    elif _LEGACY_CONST and isinstance(node, ast.Str):
+        value = node.s
+    else:
+        return None
+    return value if isinstance(value, str) else None
+
 def _validate_protocol_ast(tree):
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_AST_NODES):
             raise ValueError('Construcción no permitida: ' + type(node).__name__)
         if isinstance(node, ast.Attribute) and node.attr.startswith('_'):
             raise ValueError('Acceso a atributo no permitido: ' + node.attr)
+        if isinstance(node, ast.Attribute) and isinstance(node.ctx, ast.Store):
+            raise ValueError('Asignación a atributo no permitida: ' + node.attr)  # p. ej. math.log10 = abs
+        if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in _PROTECTED_NAMES:
+            raise ValueError('Reasignación no permitida: ' + node.id)
+        if isinstance(node, ast.Pow):  # el codegen no emite '**'; 9**9**9 cuelga/agota RAM dentro de exec
+            raise ValueError('Potencia no permitida')
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+            for side in (node.left, node.right):  # [0]*10**9 / 'x'*n
+                if isinstance(side, _SEQUENCE_NODES) or _str_literal(side) is not None:
+                    raise ValueError('Repetición de secuencias no permitida')
+        if '__' in (_str_literal(node) or ''):
+            raise ValueError('Cadena no permitida')
         if isinstance(node, ast.Name) and node.id in _DENIED_NAMES:
             raise ValueError('Nombre no permitido: ' + node.id)
         if isinstance(node, ast.Call):
@@ -504,7 +552,6 @@ def initialise(M):
         sysData[M][PUMP]['ON']=0
         sysData[M][PUMP]['direction']=1.0
         sysDevices[M][PUMP]['threadCount']=0
-        sysDevices[M][PUMP]['active']=0
     
     
     sysData[M]['Heat']['default']=0;
@@ -931,7 +978,10 @@ def SetOutputOn(M,item,force):
     if item not in _ALLOWED_ON_ITEMS:
         return jsonify({'error': 'Item no permitido'}), 400
     
-    force = int(force)
+    try:
+        force = int(force)
+    except ValueError:
+        return jsonify({'error': 'force inválido'}), 400
     M=_resolveM(M)
     #The first statements are to force it on or off it the command is called in force mode (force implies it sets it to a given state, regardless of what it is currently in)
     if (force==1):
@@ -1074,6 +1124,23 @@ def SetOutput(M,item):
     
         
   
+_pump_locks = {}
+
+def _pump_lock(M,item):
+    return _pump_locks.setdefault((M,item), Lock())
+
+def _pump_write(M,item,currentThread,f1,f2):
+    #Escribe In1/In2 de la bomba SOLO si este hilo sigue siendo el vigente, y de forma serializada por bomba.
+    #Un hilo viejo (sustituido por SetOutputTarget/Direction, que hacen OFF+ON) devuelve False sin tocar el hardware:
+    #antes podía escribir un PWM viejo o apagar la bomba que el hilo nuevo acababa de encender.
+    with _pump_lock(M,item):
+        if currentThread != sysDevices[M][item]['threadCount']:
+            return False
+        #Primero el canal que baja: al invertir el sentido In1 e In2 no quedan activos a la vez.
+        for ch,f in sorted(((sysItems[item]['In1'],f1),(sysItems[item]['In2'],f2)), key=lambda p: p[1]):
+            setPWM(M,'Pumps',ch,f,0)
+        return True
+
 def PumpModulation(M,item):
     #Responsible for turning pumps on/off. In manual mode (no experiment running) pumps run
     #continuously at full power until turned off. In experiment mode, a duty cycle is used to
@@ -1081,19 +1148,14 @@ def PumpModulation(M,item):
     global sysData
     global sysItems
     global sysDevices
-    
-    sysDevices[M][item]['threadCount']=(sysDevices[M][item]['threadCount']+1)%100 #Index of the particular thread running.
-    currentThread=sysDevices[M][item]['threadCount']
-    
-    while (sysDevices[M][item]['active']==1): #Wait if a previous thread on this pump is already running.
-        time.sleep(0.02)
 
-    # Always start by turning off to ensure a clean state
-    if (currentThread==sysDevices[M][item]['threadCount']):
-        sysDevices[M][item]['active']=1
-        setPWM(M,'Pumps',sysItems[item]['In1'],0.0,0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],0.0,0)
-        sysDevices[M][item]['active']=0
+    with _pump_lock(M,item): #El incremento debe ser atómico: dos hilos no pueden recibir el mismo índice.
+        sysDevices[M][item]['threadCount']=sysDevices[M][item]['threadCount']+1 #Index of the particular thread running.
+        currentThread=sysDevices[M][item]['threadCount']
+
+    # Always start by turning off to ensure a clean state. Si otro hilo ya nos sustituyó, salimos sin tocar nada.
+    if not _pump_write(M,item,currentThread,0.0,0.0):
+        return
 
     if (sysData[M][item]['ON']==0):
         return
@@ -1109,24 +1171,17 @@ def PumpModulation(M,item):
         else:
             pwm_fraction = PUMP_DZ + raw_fraction * (1.0 - PUMP_DZ)
 
-        sysDevices[M][item]['active']=1
         if sysData[M][item]['target'] >= 0:
-            setPWM(M,'Pumps',sysItems[item]['In1'],pwm_fraction,0)
-            setPWM(M,'Pumps',sysItems[item]['In2'],0.0,0)
+            _pump_write(M,item,currentThread,pwm_fraction,0.0)
         else:
-            setPWM(M,'Pumps',sysItems[item]['In1'],0.0,0)
-            setPWM(M,'Pumps',sysItems[item]['In2'],pwm_fraction,0)
-        sysDevices[M][item]['active']=0
+            _pump_write(M,item,currentThread,0.0,pwm_fraction)
         # Esperar hasta que el usuario la apague, cambie target (SetOutputTarget reinicia el thread) o inicie experimento
         while (sysData[M][item]['ON']==1 and
                sysDevices[M][item]['threadCount']==currentThread and
                sysData[M]['Experiment']['ON']==0):
             time.sleep(0.1)
-        # Apagar al salir del modo manual
-        sysDevices[M][item]['active']=1
-        setPWM(M,'Pumps',sysItems[item]['In1'],0.0,0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],0.0,0)
-        sysDevices[M][item]['active']=0
+        # Apagar al salir del modo manual (no-op si otro hilo ya tomó el control de la bomba)
+        _pump_write(M,item,currentThread,0.0,0.0)
         # Si el experimento acaba de iniciarse, retomar con duty cycle en nuevo thread
         if (sysData[M][item]['ON']==1 and sysDevices[M][item]['threadCount']==currentThread):
             sysDevices[M][item]['thread']=Thread(target = PumpModulation, args=(M,item))
@@ -1143,27 +1198,17 @@ def PumpModulation(M,item):
     if 0 < Ontime < PUMP_MIN_ONTIME:
         Ontime = 0.0  # Pulso demasiado corto: omitir; integrador acumula en el próximo ciclo
 
-    if (Ontime > 0 and sysData[M][item]['target']>0 and currentThread==sysDevices[M][item]['threadCount']): #Forward direction
-        sysDevices[M][item]['active']=1
-        setPWM(M,'Pumps',sysItems[item]['In1'],1.0*float(sysData[M][item]['ON']),0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],0.0*float(sysData[M][item]['ON']),0)
-        sysDevices[M][item]['active']=0
-    elif (Ontime > 0 and sysData[M][item]['target']<0 and currentThread==sysDevices[M][item]['threadCount']): #Reverse direction
-        sysDevices[M][item]['active']=1
-        setPWM(M,'Pumps',sysItems[item]['In1'],0.0*float(sysData[M][item]['ON']),0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],1.0*float(sysData[M][item]['ON']),0)
-        sysDevices[M][item]['active']=0
+    if (Ontime > 0 and sysData[M][item]['target']>0): #Forward direction
+        _pump_write(M,item,currentThread,1.0*float(sysData[M][item]['ON']),0.0)
+    elif (Ontime > 0 and sysData[M][item]['target']<0): #Reverse direction
+        _pump_write(M,item,currentThread,0.0,1.0*float(sysData[M][item]['ON']))
 
     if Ontime > 0:
         time.sleep(Ontime)
-    
-    if(abs(sysData[M][item]['target'])!=1 and currentThread==sysDevices[M][item]['threadCount']): #Turn off at end of Ontime
-        sysDevices[M][item]['active']=1
-        setPWM(M,'Pumps',sysItems[item]['In1'],0.0*float(sysData[M][item]['ON']),0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],0.0*float(sysData[M][item]['ON']),0)
-        setPWM(M,'Pumps',sysItems[item]['In1'],0.0*float(sysData[M][item]['ON']),0)
-        setPWM(M,'Pumps',sysItems[item]['In2'],0.0*float(sysData[M][item]['ON']),0)
-        sysDevices[M][item]['active']=0
+
+    if(abs(sysData[M][item]['target'])!=1): #Turn off at end of Ontime (dos veces: las bombas no tienen read-back)
+        _pump_write(M,item,currentThread,0.0,0.0)
+        _pump_write(M,item,currentThread,0.0,0.0)
     
     Time2=datetime.now()
     elapsedTime=Time2-Time1
@@ -1388,6 +1433,7 @@ def AS7341SMUX(M,device,data1,data2):
 
 
 @application.route("/GetSpectrum/<Gain>/<M>",methods=['POST'])
+@_needs_present
 def GetSpectrum(M,Gain):
     #Measures entire spectrum, i.e. every different photodiode, which requires 2 measurement shots.
     try:
@@ -1701,7 +1747,8 @@ def LightActuation(M,toggle):
 
 
 @application.route("/CharacteriseDevice/<M>/<Program>",methods=['POST'])     
-def CharacteriseDevice(M,Program): 
+@_needs_present
+def CharacteriseDevice(M,Program):
     # THis umbrella function is used to run the actual characteriseation function in a thread to prevent GUnicorn worker timeout.
     Program=str(Program)
     if (Program=='C1'):
@@ -1955,6 +2002,7 @@ def CalibrateOD(M,item,value,value2):
     
         
 @application.route("/MeasureOD/<M>",methods=['POST'])
+@_needs_present
 def MeasureOD(M):
     #Measures laser transmission and calculates calibrated OD from this.
     global sysData
@@ -2005,6 +2053,7 @@ def MeasureOD(M):
     
 
 @application.route("/MeasureFP/<M>",methods=['POST'])    
+@_needs_present
 def MeasureFP(M):
     #Responsible for measuring each of the active Fluorescent proteins.
     global sysData
@@ -2027,7 +2076,8 @@ def MeasureFP(M):
     
     
 @application.route("/MeasureTemp/<which>/<M>",methods=['POST'])
-def MeasureTemp(M,which): 
+@_needs_present
+def MeasureTemp(M,which):
     #Used to measure temperature from each thermometer.
     global sysData
     global sysItems
@@ -2170,19 +2220,20 @@ def csvData(M):
     filename=filename.replace(":","_")
 
     lock.acquire() #We are avoiding writing to a file at the same time as we do digital communications, since it might potentially cause the computer to lag and consequently data transfer to fail.
-    if os.path.isfile(filename) is False: #Only if we are starting a fresh file
-        if (len(row) == len(fieldnames)):  #AND the fieldnames match up with what is being written.
-            with open(filename, 'a') as csvFile:
-                writer = csv.writer(csvFile)
-                writer.writerow(fieldnames)
-        else:
-            print('CSV_WRITER: mismatch between column num and header num')
+    try: # Si el disco falla el lock global de I2C debe liberarse igualmente (si no, todo I2CCom queda bloqueado).
+        if os.path.isfile(filename) is False: #Only if we are starting a fresh file
+            if (len(row) == len(fieldnames)):  #AND the fieldnames match up with what is being written.
+                with open(filename, 'a') as csvFile:
+                    writer = csv.writer(csvFile)
+                    writer.writerow(fieldnames)
+            else:
+                print('CSV_WRITER: mismatch between column num and header num')
 
-    with open(filename, 'a') as csvFile: # Here we append the new data to our CSV file.
-        writer = csv.writer(csvFile)
-        writer.writerow(row)
-    csvFile.close()        
-    lock.release() 
+        with open(filename, 'a') as csvFile: # Here we append the new data to our CSV file.
+            writer = csv.writer(csvFile)
+            writer.writerow(row)
+    finally:
+        lock.release()
     
 
 def downsample(M):
@@ -2413,13 +2464,21 @@ def ExperimentReset():
 
 @application.route("/Experiment/<value>/<M>",methods=['POST'])
 def ExperimentStartStop(M,value):
-    #Stops or starts an experiment. 
+    #Stops or starts an experiment.
     global sysData
     global sysDevices
     global sysItems
     M=_resolveM(M)
-       
+
     value=int(value)
+    if sysData[M]['present']==0:
+        # Reactor ausente (p. ej. ThermometerInternal falló en caliente): no se toca I2C (I2CCom haría os._exit).
+        # Parar solo baja las banderas para que runExperiment no se reprograme; arrancar se rechaza.
+        if value:
+            return jsonify({'error': 'Reactor ausente'}), 409
+        sysData[M]['Experiment']['ON']=0
+        sysData[M]['OD']['ON']=0
+        return ('', 204)
     #Turning it on involves keeping current pump directions,
     if (value and (sysData[M]['Experiment']['ON']==0)):
         
@@ -2442,7 +2501,7 @@ def ExperimentStartStop(M,value):
         sysDevices[M]['Experiment'].setDaemon(True)
         sysDevices[M]['Experiment'].start();
         
-    else:
+    elif not value:   # un 2º start con el experimento ya ON no debe pararlo (doble clic)
         sysData[M]['Experiment']['ON']=0
         sysData[M]['OD']['ON']=0
         addTerminal(M,'Experiment Stopping at end of cycle')

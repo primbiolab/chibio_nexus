@@ -37,6 +37,8 @@ CLAUDE.md
 AGENTS.md
 CAMERA_SERVER_EXPANSION_PLAN.md
 reglas.md
+configuracion_cloudflare.md
+docs/
 
 # ── Agentes/herramientas IA (cache local, no codigo del proyecto) ─
 .agents/

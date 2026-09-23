@@ -525,13 +525,23 @@ function toast(m, t) {
   spawnToast(t || 'ok', null, m, null, 3200);
 }
 
+var _ajaxErrAt=0;
 function ajax(u,cb){
   $.ajax({
     type:'POST', url:u, timeout:5000,
     headers:{'X-Requested-With':'XMLHttpRequest'},
     success:function(r){ if(cb)cb(r); _pollTick(); },
-    error:function(){}
+    error:function(){
+      var t=Date.now();
+      if(t-_ajaxErrAt>5000){ _ajaxErrAt=t; spawnToast('err',null,'Acción no aplicada','El servidor no respondió o rechazó la petición.',4000); }
+    }
   });
+}
+/* Lee un número de un input; si no es válido avisa y devuelve null (evita URLs vacías → 404 mudo). */
+function _numVal(sel,label){
+  var v=parseFloat($(sel).val());
+  if(!isFinite(v)){ spawnToast('warn',null,'Valor inválido',label+': escribe un número.',3000); return null; }
+  return v;
 }
 
 /* ── CSV EXPORT ────────────────────────────────────────────── */
@@ -716,19 +726,25 @@ function toggleCal(){
 function changeDevice(M){ajax('/changeDevice/'+M,null);}
 function doScanDevices(){ajax('/scanDevices/all',null);spawnToast('info','fa-solid fa-satellite-dish','Escaneando','Buscando dispositivos en la red...', 3000);}
 function startExperiment(){
-  ajax('/Experiment/1/0',null);
-  if(!window._customOn) toggleCustom();
-  spawnToast('ok','fa-solid fa-play','Experimento Iniciado','El experimento ha comenzado a ejecutarse.', 4000);
+  ajax('/Experiment/1/0',function(){
+    spawnToast('ok','fa-solid fa-play','Experimento Iniciado','El experimento ha comenzado a ejecutarse.', 4000);
+  });
+  if(!window._customOn){ window._customOn=true; toggleCustom(); }   // optimista: un 2º clic antes del sondeo no debe volver a voltear SetCustom
 }
 function stopExperiment(){
-  ajax('/Experiment/0/0',null);
-  if(window._customOn) toggleCustom();
-  spawnToast('warn','fa-solid fa-stop','Experimento Detenido','El experimento se ha detenido.', 4000);
+  ajax('/Experiment/0/0',function(){
+    spawnToast('warn','fa-solid fa-stop','Experimento Detenido','El experimento se ha detenido.', 4000);
+  });
+  if(window._customOn){ window._customOn=false; toggleCustom(); }
 }
 function resetExperiment(){ajax('/ExperimentReset',null);spawnToast('warn','fa-solid fa-rotate-left','Reset','Todos los parámetros han sido reiniciados.', 3500);}
-function setOD(){ajax('/SetOutputTarget/OD/0/'+$('#ODInput').val(),null);}
+function setOD(){var v=_numVal('#ODInput','OD objetivo'); if(v!==null) ajax('/SetOutputTarget/OD/0/'+v,null);}
 function measureOD(){ajax('/MeasureOD/0',null);}
-function calibrateOD(){ajax('/CalibrateOD/OD0/0/'+$('#OD0Input').val()+'/'+$('#OD0Actual').val(),null);}
+function calibrateOD(){
+  var raw=_numVal('#OD0Input','Raw medido'); if(raw===null) return;
+  var act=_numVal('#OD0Actual','OD real'); if(act===null) return;
+  ajax('/CalibrateOD/OD0/0/'+raw+'/'+act,null);
+}
 function setVolume(){
   var v=Math.min(20,Math.max(0,parseFloat($('#VolumeInput').val())||0));
   $('#VolumeInput').val(v);
@@ -750,9 +766,9 @@ function toggleZigzag(){
   }
 }
 function measureTemp(w){ajax('/MeasureTemp/'+w+'/0',null);}
-function setThermostat(){ajax('/SetOutputTarget/Thermostat/0/'+$('#ThermostatInput').val(),null);}
+function setThermostat(){var v=_numVal('#ThermostatInput','Termostato'); if(v!==null) ajax('/SetOutputTarget/Thermostat/0/'+v,null);}
 function toggleThermostat(){ajax('/SetOutputOn/Thermostat/2/0',null);}
-function setStir(){ajax('/SetOutputTarget/Stir/0/'+$('#StirInput').val(),null);}
+function setStir(){var v=_numVal('#StirInput','Agitación'); if(v!==null) ajax('/SetOutputTarget/Stir/0/'+v,null);}
 function toggleStir(){ajax('/SetOutputOn/Stir/2/0',null);}
 var CUSTOM_PROGRAM_CONFIG={
   C1:{label:'GFP objetivo',     min:0, max:1,    step:0.01, unit:''},
@@ -811,7 +827,7 @@ function toggleCustom(){
   }
   ajax('/SetCustom/'+prog+'/'+v,null);
 }
-function setLED(l){ajax('/SetOutputTarget/'+l+'/0/'+$('#'+l+'Input').val(),null);}
+function setLED(l){var v=_numVal('#'+l+'Input',l); if(v!==null) ajax('/SetOutputTarget/'+l+'/0/'+v,null);}
 function adjLED(l,delta){
   var inp=$('#'+l+'Input');
   var v=Math.round((parseFloat(inp.val()||0)+delta)*10)/10;
@@ -819,16 +835,27 @@ function adjLED(l,delta){
   inp.val(v);
   ajax('/SetOutputTarget/'+l+'/0/'+v,null);
 }
-function switchLED(l,on){if(window._updatingLED)return;ajax('/SetOutputOn/'+l+'/'+(on?1:0)+'/0',null);}
+function switchLED(l,on){
+  if(window._updatingLED)return;
+  if(on&&(l==='UV'||l==='LASER650')&&!confirm('¿Encender '+(l==='UV'?'la luz UV':'el láser 650 nm')+'? Riesgo para la vista: no mires el reactor.')){
+    var t=document.getElementById(l+'-tog'); if(t) t.checked=false;
+    return;
+  }
+  ajax('/SetOutputOn/'+l+'/'+(on?1:0)+'/0',null);
+}
 var _pumpDir={Pump1:1,Pump2:1,Pump3:1,Pump4:1};
 function switchPump(p){ajax('/SetOutputOn/'+p+'/2/0',null);}
 function switchPumpToggle(p,on){ajax('/SetOutputOn/'+p+'/'+(on?1:0)+'/0',null);}
 function dirPump(p){ajax('/Direction/'+p+'/0',null);}
+var _pumpTimer={};
 function setPump(p){
-  var raw=parseFloat($('#'+p+'Input').val());
-  if(isNaN(raw))return;
-  var v=Math.max(-1,Math.min(1,raw));
-  ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+  clearTimeout(_pumpTimer[p]);   // el input dispara por cada tecla: una sola escritura I²C al dejar de teclear
+  _pumpTimer[p]=setTimeout(function(){
+    var raw=parseFloat($('#'+p+'Input').val());
+    if(isNaN(raw))return;
+    var v=Math.max(-1,Math.min(1,raw));
+    ajax('/SetOutputTarget/'+p+'/0/'+v,null);
+  },250);
 }
 function adjPump(p,delta){
   var inp=$('#'+p+'Input');
@@ -1127,7 +1154,9 @@ function _updateDataInner(data){
     }
     var optsHtml = ledOpts.map(function(o){return '<option value="'+o.v+'">'+o.t+'</option>';}).join('');
     ['FPExcite1','FPExcite2','FPExcite3'].forEach(function(id){
-      var el=document.getElementById(id);if(el)el.innerHTML=optsHtml;
+      var el=document.getElementById(id);if(!el)return;
+      var prev=el.value; el.innerHTML=optsHtml;
+      if(prev&&Array.prototype.some.call(el.options,function(o){return o.value===prev;}))el.value=prev;
     });
   }
 
@@ -1232,36 +1261,11 @@ function onCamSlider(){
   _camDebounce = setTimeout(_applyCssFilter, 150);
 }
 
-// ── Polling de /health: FPS, peers, estado online/offline ──
-function _fetchCamStatus(){
-  $.ajax({
-    url: _camBase + '/health',
-    method: 'GET',
-    timeout: 2000,
-    success: function(data){
-      _setCamStatus('online');
-      var fpsEl   = document.getElementById('cam-fps-val');
-      var peersEl = document.getElementById('cam-peers-val');
-      if(fpsEl)   fpsEl.textContent   = (data.fps   !== undefined) ? data.fps.toFixed(1) + ' fps' : '--';
-      if(peersEl) peersEl.textContent = (data.peers !== undefined) ? data.peers : '--';
-    },
-    error: function(){
-      _setCamStatus('offline');
-      var fpsEl   = document.getElementById('cam-fps-val');
-      var peersEl = document.getElementById('cam-peers-val');
-      if(fpsEl)   fpsEl.textContent   = '--';
-      if(peersEl) peersEl.textContent = '--';
-    }
-  });
-}
-
+// ── Polling de stats por WebSocket: FPS y peers (el estado online/offline lo fijan WS y WebRTC) ──
+// No hay fetch HTTP cross-origin a la cámara: Access lo redirige al login sin CORS si no hay cookie.
 function _startCamPoll(){
   _stopCamPoll();
-  _fetchCamStatus();
-  _camPollTimer = setInterval(function(){
-    _fetchCamStatus();
-    _requestWsStats();
-  }, 1500);
+  _camPollTimer = setInterval(_requestWsStats, 1500);
 }
 
 function _stopCamPoll(){
@@ -1297,6 +1301,12 @@ function _setCamStatus(status){
   var badge = document.getElementById('cam-offline-badge');
   if(dot)   dot.className = 'cam-dot ' + status;
   if(badge) badge.style.display = (status === 'offline') ? 'flex' : 'none';
+  if(status === 'offline'){
+    var fpsEl   = document.getElementById('cam-fps-val');
+    var peersEl = document.getElementById('cam-peers-val');
+    if(fpsEl)   fpsEl.textContent   = '--';
+    if(peersEl) peersEl.textContent = '--';
+  }
 }
 
 function _updateCamReactorInfo(){
