@@ -1195,9 +1195,30 @@ function _updateDataInner(data){
   var sp=data.AS7341&&data.AS7341.spectrum;
   if(sp){['410','440','470','510','550','583','620','670'].forEach(function(w){document.getElementById(w+'nmSense').textContent=sp['nm'+w]||'—';});document.getElementById('ClearSense').textContent=sp.CLEAR||'—';}
 
-  /* FP */
+  /* FP — sincroniza los selects de config (Excitación/Banda base/Emisión/Ganancia/
+     Proteína) UNA sola vez por reactor con lo que el servidor ya tiene guardado, para
+     que sobrevivan a un recargo de página. Solo una vez: si resincronizara en cada poll
+     (2 s) pisaría una edición del usuario todavía no enviada con "On". LED/BaseBand/etc.
+     empiezan en el entero 0 (placeholder) hasta el primer SetFPMeasurement real; con eso
+     evitamos "sincronizar" selects hacia un valor que nunca se configuró. */
+  window._fpConfigSynced = window._fpConfigSynced || {};
   ['FP1','FP2','FP3'].forEach(function(fp,fi){
     var n=fi+1;if(!data[fp])return;
+    var syncKey=data.UIDevice+'_'+fp;
+    if(typeof data[fp].LED==='string' && window._fpConfigSynced[syncKey]!==true){
+      window._fpConfigSynced[syncKey]=true;
+      $('#FPExcite'+n).val(data[fp].LED);
+      $('#FPBase'+n).val(data[fp].BaseBand);
+      $('#FPEmit'+n+'A').val(data[fp].Emit1Band);
+      $('#FPEmit'+n+'B').val(data[fp].Emit2Band);
+      if(typeof data[fp].Gain==='string') $('#FPGain'+n).val(data[fp].Gain);
+      var matched='';
+      for(var k in FP_PRESETS){
+        var pr=FP_PRESETS[k];
+        if(pr.excite===data[fp].LED && pr.base===data[fp].BaseBand && pr.em1===data[fp].Emit1Band && pr.em2===data[fp].Emit2Band){matched=k;break;}
+      }
+      $('#FPProtein'+n).val(matched);
+    }
     document.getElementById('FPBase'+n+'Value').textContent=data[fp].Base.toFixed(0);
     document.getElementById('FPEmit'+n+'AValue').textContent=data[fp].Emit1.toFixed(3);
     document.getElementById('FPEmit'+n+'BValue').textContent=data[fp].Emit2.toFixed(3);

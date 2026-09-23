@@ -492,9 +492,23 @@ def direction(pump, M):
     print(f'[MOCK] Dirección {pump} invertida en {dev}')
     return ('', 204)
 
-@app.route('/SetFPMeasurement/<fp>/<exc>/<base>/<em1>/<em2>/<gain>', methods=['POST'])
-def setFPMeasurement(fp, exc, base, em1, em2, gain):
-    print(f'[MOCK] FP config: {fp} exc={exc} base={base} em1={em1} em2={em2} gain={gain}')
+@app.route('/SetFPMeasurement/<fp>/<exc>/<base>/<em1>/<em2>/<gain>', defaults={'M': '0'}, methods=['POST'])
+@app.route('/SetFPMeasurement/<fp>/<exc>/<base>/<em1>/<em2>/<gain>/<M>', methods=['POST'])
+def setFPMeasurement(fp, exc, base, em1, em2, gain, M):
+    # Espejo de app.py: flip-toggle. Off→On guarda LED/BaseBand/Emit1Band/Emit2Band/Gain
+    # (necesario para que los selects de FP sobrevivan a un recargo — ver nexus.js).
+    M = _resolveM(M)
+    mut = _REACTOR_MUT.setdefault(M, {}).setdefault(fp, {})
+    if mut.get('ON'):
+        mut['ON'] = 0
+    else:
+        mut['ON'] = 1
+        mut['LED'] = exc
+        mut['BaseBand'] = base
+        mut['Emit1Band'] = em1
+        mut['Emit2Band'] = em2
+        mut['Gain'] = gain
+    print(f'[MOCK] FP config: {fp} -> ON={mut["ON"]} exc={exc} base={base} em1={em1} em2={em2} gain={gain} en {M}')
     return ('', 204)
 
 @app.route('/CalibrateOD/<param>/<M>/<raw>/<actual>', methods=['POST'])
