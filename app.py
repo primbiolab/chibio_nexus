@@ -435,6 +435,10 @@ _DENIED_NAMES = {
 # obtendría un alias de una función permitida apuntando a otra cosa y saltaría la allowlist de llamadas.
 _PROTECTED_NAMES = _ALLOWED_CALLS | _DENIED_NAMES | {'sysData', 'M', 'program', 'time', 'math', 'datetime'}
 _SEQUENCE_NODES = (ast.List, ast.Tuple, ast.JoinedStr)
+# El codegen (architect.js compileFSM) nunca escribe ['max']/['min']: solo ['target'],
+# ['Status'] y demás campos de Custom/Chemostat/Zigzag. Bloquear estas dos claves cierra
+# `sysData[M]['Heat']['max'] = 999` sin tocar el Subscript Store que el codegen sí necesita.
+_LIMIT_KEYS = {'max', 'min'}
 
 def _str_literal(node):
     # Valor de un literal de texto, o None si el nodo no lo es: ast.Constant (3.8+) o ast.Str (3.7).
@@ -446,6 +450,14 @@ def _str_literal(node):
         return None
     return value if isinstance(value, str) else None
 
+def _subscript_key(node):
+    # Texto del índice de un Subscript, o None si no es un literal de texto. En 3.9+
+    # node.slice es la expresión directa; en 3.7/3.8 viene envuelta en ast.Index.
+    sl = node.slice
+    if isinstance(sl, ast.Index):
+        sl = sl.value
+    return _str_literal(sl)
+
 def _validate_protocol_ast(tree):
     for node in ast.walk(tree):
         if not isinstance(node, _ALLOWED_AST_NODES):
@@ -456,6 +468,8 @@ def _validate_protocol_ast(tree):
             raise ValueError('Asignación a atributo no permitida: ' + node.attr)  # p. ej. math.log10 = abs
         if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store) and node.id in _PROTECTED_NAMES:
             raise ValueError('Reasignación no permitida: ' + node.id)
+        if isinstance(node, ast.Subscript) and isinstance(node.ctx, ast.Store) and _subscript_key(node) in _LIMIT_KEYS:
+            raise ValueError('Reasignación de límite no permitida: ' + _subscript_key(node))
         if isinstance(node, ast.Pow):  # el codegen no emite '**'; 9**9**9 cuelga/agota RAM dentro de exec
             raise ValueError('Potencia no permitida')
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
