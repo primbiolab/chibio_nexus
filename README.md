@@ -106,7 +106,7 @@ pkill -f gunicorn && sleep 2 && bash scripts/beaglebone/cb.sh
 chibio_nexus/
 ├── app.py                     ← Servidor Flask (BeagleBone)
 ├── mock_server.py             ← Servidor simulado (demo sin hardware)
-├── prompts.py                 ← Prompts de Gemini (compartidos por app.py y el simulador)
+├── protocolo_mock.py          ← Protocolo de ejemplo para el simulador
 ├── lanzador_dev.py            ← Lanzador del simulador
 ├── lanzador_real.py           ← Panel de control GUI (PC, hardware real)
 ├── compilar.ps1               ← Genera ChiBioNexus-Demo.exe y ChiBioNexus-Real.exe (PyInstaller)
@@ -131,8 +131,6 @@ chibio_nexus/
 │   └── beaglebone/             ← Scripts Linux (BeagleBone)
 │       ├── cb.sh                         ← Inicio del servidor
 │       └── setup_beaglebone.sh           ← Instalación inicial
-├── tests/
-│   └── test_mock_server.py    ← Suite pytest contra el simulador
 ├── templates/
 │   ├── index.html             ← Interfaz principal (Nexus)
 │   ├── architect.html         ← Editor de protocolos (Architect)
