@@ -23,6 +23,52 @@ import smbus2 as smbus
 from collections import OrderedDict
 from prompts import GENERATE_PROTOCOL_SYSTEM
 
+try:
+    import resource as _resource          # Windows/dev no tiene el módulo
+except ImportError:
+    _resource = None
+
+
+# ── Tope de memoria del proceso (DoS de memoria vía variables en /injectProtocol/) ──
+# El validador AST no puede acotar `a = a*N`, `a += a`, `sysData[...]*N` ni
+# f"{1:999999999}": la rampa del Architect necesita Mult sobre nombres, y sysData
+# expone secuencias reales por subscript. Sin tope, esas asignaciones agotan la RAM
+# de la BeagleBone y el OOM killer mata gunicorn: se pierde el control de los 8
+# reactores. Con RLIMIT_DATA esas asignaciones levantan MemoryError en su lugar, que
+# _nexus_exec ya captura. RLIMIT_DATA y no RLIMIT_AS: AS cuenta los stacks de hilos,
+# y este proceso crea hilos sin parar (runWatchdog se re-lanza cada 0.15 s); con AS
+# el fallo típico sería "can't start new thread" en el watchdog, no un MemoryError
+# contenido. CHIBIO_MEM_LIMIT_MB=0 desactiva el tope.
+def _vm_data_mb():
+    """MB de 'data' del proceso según /proc; None fuera de Linux."""
+    try:
+        with open('/proc/self/status') as f:
+            for linea in f:
+                if linea.startswith('VmData:'):
+                    return int(linea.split()[1]) / 1024.0
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+def _aplicar_limite_memoria(mod, mb, base_mb):
+    """Fija el soft RLIMIT_DATA. Devuelve (bytes_aplicados_o_None, motivo)."""
+    if mod is None or mb <= 0:
+        return (None, 'desactivado')
+    if base_mb and mb < base_mb * 2:
+        return (None, 'tope %d MB < 2x uso actual (%.0f MB): NO aplicado' % (mb, base_mb))
+    soft, hard = mod.getrlimit(mod.RLIMIT_DATA)
+    nuevo = int(mb * 1024 * 1024)
+    if hard != mod.RLIM_INFINITY and nuevo > hard:
+        nuevo = hard
+    mod.setrlimit(mod.RLIMIT_DATA, (nuevo, hard))
+    return (nuevo, 'ok')
+
+MEM_LIMIT_MB = int(os.environ.get('CHIBIO_MEM_LIMIT_MB', '256'))
+_MEM_BASE_MB = _vm_data_mb()
+_MEM_LIMIT, _MEM_MOTIVO = _aplicar_limite_memoria(_resource, MEM_LIMIT_MB, _MEM_BASE_MB)
+print(str(datetime.now()) + ' [MEM] RLIMIT_DATA=' + str(MEM_LIMIT_MB) + ' MB (' + _MEM_MOTIVO +
+      ') | VmData al arrancar=' + str(_MEM_BASE_MB) + ' MB')
+
 
 # ── Estado interno del protocolo inyectado vía Nexus ───────────────
 _cloud = {
