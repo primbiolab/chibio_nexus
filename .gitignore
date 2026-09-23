@@ -44,6 +44,9 @@ reglas.md
 graphify-out/
 .pytest_cache/
 
+# ── Tests (herramienta de desarrollo, no se publica) ──────────
+tests/
+
 # ── Node (solo si algun script usa npm/node localmente) ────────
 node_modules/
 package.json
