@@ -366,8 +366,13 @@ function _parseRecordStr(s){
   return s.split(',').map(function(v){return parseFloat(v.trim());}).filter(function(v){return !isNaN(v);});
 }
 
+/* loader.js crea google.visualization antes de terminar de cargar los paquetes: si el primer
+   sondeo llega antes, updateData ya marcó GraphReplot y no redibujaría hasta el próximo punto
+   (un ciclo entero, 60 s por defecto). Redibujar en cuanto terminen de cargar. */
+if(typeof google!=='undefined'&&google.charts) google.charts.setOnLoadCallback(function(){ if(_lastData) _drawAllCharts(_lastData); });
+
 function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,seriesNames){
-  if(typeof google==='undefined'||!google.visualization)return;
+  if(typeof google==='undefined'||!google.visualization||!google.visualization.DataTable)return;
   var containerId='chart_div'+chartNum;
   var el=document.getElementById(containerId);
   if(!el)return;
