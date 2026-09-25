@@ -580,7 +580,7 @@ function buildForm(node, body, parentArr){
     }
 
     case 'pump': {
-      row('Bomba', selEl('pump', [['Pump1','Pump1 (In)'],['Pump2','Pump2 (Out)'],['Pump3','Pump3 (Aux)'],['Pump4','Pump4 (Aux)']], node.pump, () => { updatePumpNote(); updateVol(); }));
+      row('Bomba', selEl('pump', [['Pump1','Bomba 1 (entrada)'],['Pump2','Bomba 2 (salida)'],['Pump3','Bomba 3 (auxiliar)'],['Pump4','Bomba 4 (auxiliar)']], node.pump, () => { updatePumpNote(); updateVol(); }));
       row('Duración (segundos)', numInput('duration', node.duration, 0.1, 60, 0.1));
       const pnote=note('','');
       function updatePumpNote(){
@@ -595,7 +595,7 @@ function buildForm(node, body, parentArr){
     }
 
     case 'turbidostat': row('Estado', selEl('state', [['on','Activar'],['off','Desactivar']], node.state)); break;
-    case 'chemostat': row('Estado', selEl('state', [['on','Activar'],['off','Desactivar']], node.state)); row('Tasa Pump1 (entrada)', numInput('p1', node.p1, 0, 1, 0.001)); row('Tasa Pump2 (salida)', numInput('p2', node.p2, 0, 1, 0.001)); break;
+    case 'chemostat': row('Estado', selEl('state', [['on','Activar'],['off','Desactivar']], node.state)); row('Tasa bomba 1 (entrada)', numInput('p1', node.p1, 0, 1, 0.001)); row('Tasa bomba 2 (salida)', numInput('p2', node.p2, 0, 1, 0.001)); break;
     case 'zigzag': row('Estado', selEl('state', [['on','Activar'],['off','Desactivar']], node.state)); row('Amplitud Zig (OD)', numInput('zig', node.zig, 0.01, 0.5, 0.01)); note('<i class="fa-solid fa-info-circle"></i> La frecuencia depende de la biología. Enciende el Turbidostato implícitamente.','info'); break;
     case 'measure_od': note('<i class="fa-solid fa-check-circle"></i> Auto-inyecta pausa del Stirrer para evitar ruido.','ok'); break;
 
@@ -748,7 +748,7 @@ function validate(nodes,errs,warns,M){
         break;
       case 'pump': if(n.duration>20) warns.push(`[Bomba ${n.pump}] Duración > 20s. Pausará la toma de datos del biorreactor.`); break;
       case 'wait': if(n.unit==='sec'&&n.duration>15) errs.push(`[Esperar] Seleccionaste segundos y pusiste más de 15s. Colapsará el ciclo principal. Usa "Minutos" o "Generaciones".`); break;
-      case 'chemostat': if(n.p2<=n.p1) warns.push(`[Quimiostato] Pump2 (Out) debería ser mayor que Pump1 para mantener el nivel de líquido.`); break;
+      case 'chemostat': if(n.p2<=n.p1) warns.push(`[Quimiostato] La tasa de la bomba 2 (salida) debería ser mayor que la de la bomba 1 (entrada) para mantener el nivel de líquido.`); break;
       case 'turbidostat': case 'zigzag': usesOptics=true; break;
       case 'trigger': {
         const VALID_TVARS = ['OD','GrowthRate','Temp','FP1','FP2','FP3','Generations'];
@@ -1414,7 +1414,7 @@ function renderTourStep(){
   // Buttons
   const isLast  = tourStep === TOUR_STEPS.length-1;
   const isFirst = tourStep === 0;
-  document.getElementById('tour-btn-next').textContent = isLast ? '¡Listo! 🎉' : 'Siguiente →';
+  document.getElementById('tour-btn-next').innerHTML = isLast ? '<i class="fa-solid fa-check"></i> Listo' : 'Siguiente <i class="fa-solid fa-arrow-right"></i>';
   document.getElementById('tour-btn-prev').style.visibility = isFirst ? 'hidden' : 'visible';
   document.getElementById('tour-step-count').textContent = (tourStep+1) + ' / ' + TOUR_STEPS.length;
 

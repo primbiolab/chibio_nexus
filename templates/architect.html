@@ -213,10 +213,10 @@
     <p id="tour-desc"></p>
     <div class="tour-footer">
       <span id="tour-step-count" style="font-size:11px;color:var(--text3);font-family:var(--mono)"></span>
-      <button class="tour-skip" onclick="endTour()">✕ Saltar</button>
+      <button class="tour-skip" onclick="endTour()"><i class="fa-solid fa-xmark"></i> Saltar</button>
       <div class="tour-nav">
-        <button class="btn btn-ghost" id="tour-btn-prev" onclick="tourPrev()" style="font-size:11px;padding:4px 9px">← Atrás</button>
-        <button class="btn btn-accent" id="tour-btn-next" onclick="tourNext()" style="font-size:11px;padding:4px 9px">Siguiente →</button>
+        <button class="btn btn-ghost" id="tour-btn-prev" onclick="tourPrev()" style="font-size:11px;padding:4px 9px"><i class="fa-solid fa-arrow-left"></i> Atrás</button>
+        <button class="btn btn-accent" id="tour-btn-next" onclick="tourNext()" style="font-size:11px;padding:4px 9px">Siguiente <i class="fa-solid fa-arrow-right"></i></button>
       </div>
     </div>
   </div>
@@ -286,10 +286,10 @@
       Calibra el caudal real de cada bomba y el volumen inicial de líquido en el reactor para calcular volúmenes precisos.
     </p>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <div class="frow"><label class="flbl" for="p_rate1">Pump1 (entrada) — ml/min</label><input type="number" id="p_rate1" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><label class="flbl" for="p_rate2">Pump2 (salida) — ml/min</label><input type="number" id="p_rate2" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><label class="flbl" for="p_rate3">Pump3 (aux) — ml/min</label><input type="number" id="p_rate3" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><label class="flbl" for="p_rate4">Pump4 (aux) — ml/min</label><input type="number" id="p_rate4" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate1">Bomba 1 (entrada) — ml/min</label><input type="number" id="p_rate1" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate2">Bomba 2 (salida) — ml/min</label><input type="number" id="p_rate2" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate3">Bomba 3 (auxiliar) — ml/min</label><input type="number" id="p_rate3" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate4">Bomba 4 (auxiliar) — ml/min</label><input type="number" id="p_rate4" class="finp" min="0" step="0.1" value="1.0"></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
       <div class="frow"><label class="flbl" for="p_init_vol">Volumen inicial en reactor — ml</label><input type="number" id="p_init_vol" class="finp" min="0" max="20" step="0.5" value="20.0"></div>
     </div>

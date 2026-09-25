@@ -192,6 +192,9 @@ body.tour-active .pill.disabled {
 .finp-txt:focus{border-color:var(--accent);}
 .fsel{background:var(--surface2);border:1px solid var(--border);color:var(--text); padding:4px 8px;border-radius:5px;font-family:var(--mono);font-size:12px;flex:1; outline:none;cursor:pointer;transition:border-color .15s;min-width:0;}
 .fsel:focus{border-color:var(--accent);}
+/* Campos de bloque: un número no necesita 1100px de ancho; texto libre algo más */
+.cb-body .finp,.cb-body .fsel{max-width:340px;}
+.cb-body .finp-txt{max-width:560px;}
 .fnote{font-size:10px;color:var(--text3);margin-top:3px;line-height:1.4; display:flex;align-items:flex-start;gap:4px;}
 .fnote.warn{color:var(--warn);} .fnote.danger{color:var(--danger);} .fnote.ok{color:var(--accent);} .fnote.info{color:var(--info);}
 .ferr-msg{font-size:10px;color:var(--danger);margin-top:2px;display:none;}
