@@ -1104,6 +1104,7 @@ function _updateCloudPill(d){
   }else{
     t.textContent='Cloud';
   }
+  p.title=t.textContent;   // en barra compacta el rótulo se oculta
   _cloudPrev=d.status;
 }
 

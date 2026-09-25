@@ -97,8 +97,24 @@ input,select{font-family:var(--f-ui);}
 
 .tb-text{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
 
-#cyc{font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--tx3);padding:3px 9px;border:1px solid var(--bd);border-radius:var(--rsm);}
+#cyc{white-space:nowrap;font-family:var(--f-ui);font-weight:700;font-size:11px;color:var(--tx3);padding:3px 9px;border:1px solid var(--bd);border-radius:var(--rsm);}
 .tb-r{margin-left:auto;display:flex;align-items:center;gap:6px;}
+#ctx-main{align-items:center;gap:9px;flex:1;min-width:0;}
+#main-action-btns{margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0;}
+#global-buttons{display:flex;align-items:center;gap:9px;flex-shrink:0;}
+/* Barra compacta: todo el contenido mide ~1520px. Por debajo, los rótulos secundarios
+   pasan a solo icono (con title/aria-label); Iniciar y Detener nunca pierden su texto. */
+@media (max-width:1535px){
+  #topbar .logo > div,#topbar .tb-lbl{display:none;}
+  .nexus-tab{padding:4px 10px;}
+  .cpill:not(.ok):not(.new):not(.err):not(.downloading) #cloud-pill-text{display:none;}
+}
+@media (max-width:1180px){
+  #topbar,#ctx-main,#global-buttons{gap:6px;}
+  #topbar{padding:0 10px;}
+  .dev-btn{padding:3px 6px;}
+  #StartTime{display:none;}
+}
 .btn{display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:var(--rsm);font-family:var(--f-ui);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease,opacity 120ms ease,filter 120ms ease;white-space:nowrap;}
 .btn:active:not(:disabled){transform:scale(0.97);}
 .btn:disabled{opacity:.35;pointer-events:none;}
