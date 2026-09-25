@@ -650,27 +650,7 @@ function exportToCSV() {
 }
 
 /* ── RIPPLE EFFECT ────────────────────────────────────────── */
-function createRipple(e) {
-  var btn = e.currentTarget;
-  var circle = document.createElement('span');
-  var d = Math.max(btn.clientWidth, btn.clientHeight);
-  var rect = btn.getBoundingClientRect();
-  circle.style.width = circle.style.height = d + 'px';
-  circle.style.left = (e.clientX - rect.left - d / 2) + 'px';
-  circle.style.top  = (e.clientY - rect.top  - d / 2) + 'px';
-  circle.className = 'ripple-circle';
-  var old = btn.querySelector('.ripple-circle');
-  if (old) old.remove();
-  btn.appendChild(circle);
-  setTimeout(function(){ if(circle.parentNode) circle.remove(); }, 550);
-}
-
-// Auto-inject ripple on all primary buttons
 document.addEventListener('DOMContentLoaded', function() {
-  var selectors = '.btn, .ib, .mb, .dev-btn, .btn-csv';
-  document.querySelectorAll(selectors).forEach(function(el) {
-    el.addEventListener('click', createRipple);
-  });
   updateCustomFieldUI();
 });
 
