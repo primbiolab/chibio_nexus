@@ -952,7 +952,9 @@ function updateToggleAllFPLabel(){
   });
   var btn=document.getElementById('ToggleAllFP');
   if(!btn)return;
-  btn.textContent=_anyFPExpanded()?'Colapsar todas':'Expandir todas';
+  var open=_anyFPExpanded(), lbl=open?'Colapsar todas las tarjetas':'Expandir todas las tarjetas';
+  btn.classList.toggle('all-collapsed',!open);   // el doble chevron rota como el de cada tarjeta
+  btn.title=lbl; btn.setAttribute('aria-label',lbl); btn.setAttribute('aria-expanded',open?'true':'false');
 }
 
 /* Elementos clicables que no son <button> (casillas de temperatura, insignia de seguridad):

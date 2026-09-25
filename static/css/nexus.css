@@ -421,6 +421,13 @@ select.field{cursor:pointer;}
 .fp-head-toggle{cursor:pointer;user-select:none;}
 @media (hover:hover) and (pointer:fine){.fp-head-toggle:hover .fp-t{color:var(--gr);}}
 .fp-chevron{font-size:9px;color:var(--tx3);transition:transform 150ms cubic-bezier(0.23,1,0.32,1);}
+/* Colapsar/expandir todas: indicador de solo icono, gira igual que el chevron de cada tarjeta */
+.fp-all-btn{width:26px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--rsm);background:transparent;border:1px solid var(--bd2);color:var(--tx2);cursor:pointer;
+  transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;}
+.fp-all-btn i{font-size:11px;transition:transform 150ms cubic-bezier(0.23,1,0.32,1);}
+.fp-all-btn.all-collapsed i{transform:rotate(180deg);}
+@media (hover:hover) and (pointer:fine){.fp-all-btn:hover{background:var(--s3);color:var(--tx);}}
+.fp-all-btn:active{transform:scale(0.97);}
 .fp-chev-btn{background:none;border:none;padding:2px 3px;margin:-2px -3px;cursor:pointer;color:inherit;border-radius:4px;display:inline-flex;}
 .fp-card.fp-collapsed .fp-chevron{transform:rotate(180deg);}
 .fp-config-wrap{display:grid;grid-template-rows:1fr;transition:grid-template-rows 200ms cubic-bezier(0.23,1,0.32,1);}
@@ -428,7 +435,7 @@ select.field{cursor:pointer;}
 .fp-card.fp-collapsed .fp-config-wrap{grid-template-rows:0fr;}
 .fp-card.fp-collapsed .fp-config{opacity:0;transform:translateY(-4px);}
 .fp-card.fp-collapsed .fp-head{margin-bottom:4px;}
-@media (prefers-reduced-motion:reduce){.fp-chevron,.fp-config,.fp-config-wrap,.btn,.ib,.dev-btn,.btn-csv,.cpane,.ctab,.mb,.ttile,.cht-tog,.nexus-tab,.pump-dir-btn,.pump-toggle-thumb{transition-duration:0ms;}
+@media (prefers-reduced-motion:reduce){.fp-chevron,.fp-config,.fp-config-wrap,.btn,.ib,.dev-btn,.btn-csv,.cpane,.ctab,.mb,.ttile,.cht-tog,.nexus-tab,.pump-dir-btn,.pump-toggle-thumb,.fp-all-btn,.fp-all-btn i{transition-duration:0ms;}
   .card,.cbox,.cpill.downloading,.cpill.downloading .cloud-ico,.sorb.spin{animation:none;}
   .ripple-circle{display:none;}}
 .fp-t{font-weight:700;font-size:12px;}
