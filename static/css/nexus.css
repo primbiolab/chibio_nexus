@@ -384,17 +384,18 @@ select.field{cursor:pointer;}
 .term-hdr-sys{background:rgba(255,255,255,0.02);border-left:2px solid #1a2233;}
 .term-group-label{font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;}
 .term-hdr-active .term-group-label{color:#4ecb8a;}
-.term-hdr-done   .term-group-label{color:#234a32;}
-.term-hdr-sys    .term-group-label{color:#1e2d44;}
+.term-hdr-done   .term-group-label{color:#5a8a6f;}
+.term-hdr-sys    .term-group-label{color:#5e7f9e;}
 .term-badge{font-size:8.5px;padding:1px 5px;border-radius:9px;font-weight:600;display:flex;align-items:center;gap:3px;}
 .term-badge-active{color:#4ecb8a;}
-.term-badge-done{color:#1e3a2a;}
+.term-badge-done{color:#5a8a6f;}
 .term-dot{width:5px;height:5px;border-radius:50%;background:#4ecb8a;display:inline-block;animation:term-pulse 1.4s ease-in-out infinite;}
 @keyframes term-pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
 .term-entry{display:flex;gap:7px;padding:1px 7px;align-items:baseline;}
-.term-time{color:#1d3a28;font-size:9px;flex-shrink:0;min-width:42px;}
+/* Tonos atenuados de la terminal a >=4.5:1 sobre #050810 (antes 1.4-2.0:1, casi invisibles) */
+.term-time{color:#5a8a6f;font-size:9px;flex-shrink:0;min-width:42px;}
 .term-msg{color:#4ecb8a;font-size:10px;word-break:break-word;}
-.term-msg-dim{color:#1e3a28;font-size:9.5px;}
+.term-msg-dim{color:#5a8a6f;font-size:9.5px;}
 .term-empty{color:#1a2e1e;font-size:10px;display:block;text-align:center;padding:24px 0;}
 
 /* ── FP PANELS ───────────────────────────────────────────── */
