@@ -38,8 +38,18 @@ const META = {
 const LED_WL = {LEDB:'457nm',LEDC:'500nm',LEDD:'523nm',LEDF:'623nm',LEDH:'600nm',LEDI:'550nm',LEDV:'Blanco'};
 
 // ── Modals & Settings ─────────────────────────────────────
-function _openModal(el){ el.classList.add('open'); el.offsetHeight; el.classList.add('visible'); }
-function _closeModal(el){ el.classList.remove('open','visible'); }
+// Modales: al abrir, el foco entra al diálogo; al cerrar, vuelve a quien lo abrió. Escape: ver keydown.
+function _openModal(el){
+  el._returnFocus = document.activeElement;
+  el.classList.add('open'); el.offsetHeight; el.classList.add('visible');
+  const f = el.querySelector('input, select, [role="checkbox"], [role="button"], button:not([disabled])');
+  if(f) f.focus();
+}
+function _closeModal(el){
+  el.classList.remove('open','visible');
+  if(el._returnFocus && document.contains(el._returnFocus)) el._returnFocus.focus();
+  el._returnFocus = null;
+}
 
 function openPumpModal() {
     document.getElementById('p_rate1').value = globalPumps.Pump1;
@@ -70,6 +80,7 @@ function saveCloudConfig(){
 }
 function openSafety(){  cs1=false; cs2=false; cs3=false;['cs1','cs2','cs3'].forEach(id=>document.getElementById(id).classList.remove('done'));
   ['cc1','cc2','cc3'].forEach(id=>{ document.getElementById(id).textContent=''; });
+  ['cs1','cs2','cs3'].forEach(id=>document.getElementById(id).setAttribute('aria-checked','false'));
   
   needOdCalibration = AST.some(n =>['turbidostat','zigzag','measure_od'].includes(n.type) || (n.type==='trigger' && n.tvar==='OD'));
   document.getElementById('cs3').style.display = needOdCalibration ? 'flex' : 'none';
@@ -78,9 +89,9 @@ function openSafety(){  cs1=false; cs2=false; cs3=false;['cs1','cs2','cs3'].forE
   _openModal(document.getElementById('modal-safety'));
 }
 function toggleCS(n){
-  if(n===1) { cs1=!cs1; document.getElementById('cs1').classList.toggle('done',cs1); document.getElementById('cc1').textContent=cs1?'✓':''; }
-  else if(n===2) { cs2=!cs2; document.getElementById('cs2').classList.toggle('done',cs2); document.getElementById('cc2').textContent=cs2?'✓':''; }
-  else { cs3=!cs3; document.getElementById('cs3').classList.toggle('done',cs3); document.getElementById('cc3').textContent=cs3?'✓':''; }
+  if(n===1) { cs1=!cs1; document.getElementById('cs1').classList.toggle('done',cs1); document.getElementById('cs1').setAttribute('aria-checked',cs1); document.getElementById('cc1').innerHTML=cs1?'<i class="fa-solid fa-check"></i>':''; }
+  else if(n===2) { cs2=!cs2; document.getElementById('cs2').classList.toggle('done',cs2); document.getElementById('cs2').setAttribute('aria-checked',cs2); document.getElementById('cc2').innerHTML=cs2?'<i class="fa-solid fa-check"></i>':''; }
+  else { cs3=!cs3; document.getElementById('cs3').classList.toggle('done',cs3); document.getElementById('cs3').setAttribute('aria-checked',cs3); document.getElementById('cc3').innerHTML=cs3?'<i class="fa-solid fa-check"></i>':''; }
   
   let valid = cs1 && cs2;
   if(needOdCalibration) valid = valid && cs3;
@@ -478,10 +489,16 @@ function buildBlock(node, step, parentArr, depth){
   div.appendChild(hdr);
 
   const body=document.createElement('div'); body.className='cb-body';
-  buildForm(node, body, parentArr); div.appendChild(body); return div;
+  buildForm(node, body, parentArr); _labelFields(body); div.appendChild(body); return div;
 }
 
 // ── Form builder ──────────────────────────────────────────
+function _labelFields(root){
+  root.querySelectorAll('.frow').forEach(r=>{
+    const l=r.querySelector('.flbl'), c=r.querySelector('input, select, textarea');
+    if(l && c && !c.hasAttribute('aria-label') && !c.id) c.setAttribute('aria-label', l.textContent.trim());
+  });
+}
 function buildForm(node, body, parentArr){
   function row(lbl, el){ const d=document.createElement('div'); d.className='frow'; d.innerHTML=`<span class="flbl">${lbl}</span>`; d.appendChild(el); body.appendChild(d); return d; }
   function note(txt, cls){ const d=document.createElement('div'); d.className='fnote'+(cls?' '+cls:''); d.innerHTML=txt; body.appendChild(d); return d; }
@@ -590,6 +607,8 @@ function buildForm(node, body, parentArr){
       const sv=selEl('tvar', TVARS, node.tvar);
       const so=selEl('op', TOPS, node.op);
       const ni=numInput('val', node.val, -1000, 1000, 0.01);
+      so.setAttribute('aria-label','Comparación');
+      const niInp=ni.querySelector ? (ni.querySelector('input')||ni) : ni; niInp.setAttribute('aria-label','Valor umbral');
       tr.append(lbl,sv,so,ni); tcond.appendChild(tr); body.appendChild(tcond);
       
       appendChildrenSection(body, node.children, 'Bloques a ejecutar', node);
@@ -613,7 +632,7 @@ function openPicker(arr){
   pickerTarget=arr; document.getElementById('picker-list').innerHTML='';
   Object.entries(META).forEach(([type,m])=>{
     if(['init_temp','init_od','init_stir'].includes(type) && arr!==AST) return;
-    const d=document.createElement('div'); d.className='mpill';
+    const d=document.createElement('div'); d.className='mpill'; d.setAttribute('role','button'); d.tabIndex=0;
     d.innerHTML=`<div class="pi" style="background:${m.col}18;color:${m.col};width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0"><i class="fa-solid ${m.ico}"></i></div><span style="font-size:12px">${m.label}</span>`;
     d.addEventListener('click',()=>{ arr.push(mkNode(type)); refresh(); closePickerBtn(); });
     document.getElementById('picker-list').appendChild(d);
@@ -1577,6 +1596,18 @@ document.addEventListener('click', e => {
 
 // ── KEYBOARD SHORTCUTS ────────────────────────────────────────
 document.addEventListener('keydown', e => {
+  const openM = document.querySelector('.moverlay.open');
+  if(e.key === 'Escape' && openM){
+    e.preventDefault();
+    if(openM.id === 'modal-safety') closeSafetyBtn(false);
+    else if(openM.id === 'modal-picker') closePickerBtn();
+    else _closeModal(openM);
+    return;
+  }
+  const role = e.target.getAttribute && e.target.getAttribute('role');
+  if((e.key === 'Enter' || e.key === ' ') && (role === 'button' || role === 'checkbox')){
+    e.preventDefault(); e.target.click(); return;
+  }
   const tag = document.activeElement?.tagName;
   const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 

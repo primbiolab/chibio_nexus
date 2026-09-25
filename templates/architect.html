@@ -53,79 +53,79 @@
 <div class="palette" id="palette">
 
   <div class="cat"><i class="fa-solid fa-gear" style="color:var(--text3)"></i>Condiciones Iniciales</div>
-  <div class="pill" draggable="true" data-btype="init_temp" onclick="addBlock('init_temp')" data-tip="Fija la temperatura objetivo del termostato al inicio del experimento. Solo puede usarse una vez. Rango: 0–50°C." >
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="init_temp" onclick="addBlock('init_temp')" data-tip="Fija la temperatura objetivo del termostato al inicio del experimento. Solo puede usarse una vez. Rango: 0–50°C." >
     <div class="pi" style="background:rgba(239,68,68,.12);color:#ef4444"><i class="fa-solid fa-temperature-half"></i></div>
     <div><div class="pn">Temperatura inicial</div><div class="pd">Setpoint del termostato</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="init_od" onclick="addBlock('init_od')" data-tip="Define el OD (Densidad Óptica) objetivo para el turbidostato. Solo puede usarse una vez. El sensor mide la turbidez del cultivo.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="init_od" onclick="addBlock('init_od')" data-tip="Define el OD (Densidad Óptica) objetivo para el turbidostato. Solo puede usarse una vez. El sensor mide la turbidez del cultivo.">
     <div class="pi" style="background:rgba(0,229,160,.12);color:#00e5a0"><i class="fa-solid fa-bullseye"></i></div>
     <div><div class="pn">OD objetivo inicial</div><div class="pd">Setpoint del turbidostato</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="init_stir" onclick="addBlock('init_stir')" data-tip="Activa el agitador magnético al inicio. Valor entre 0 (parado) y 1 (máxima velocidad). 0.5 es la velocidad estándar para cultivos.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="init_stir" onclick="addBlock('init_stir')" data-tip="Activa el agitador magnético al inicio. Valor entre 0 (parado) y 1 (máxima velocidad). 0.5 es la velocidad estándar para cultivos.">
     <div class="pi" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-fan"></i></div>
     <div><div class="pn">Agitación inicial</div><div class="pd">Velocidad del agitador</div></div>
   </div>
 
   <div class="cat"><i class="fa-solid fa-microchip" style="color:var(--text3)"></i>Hardware</div>
-  <div class="pill" draggable="true" data-btype="thermostat" onclick="addBlock('thermostat')" data-tip="Cambia la temperatura objetivo en cualquier punto del protocolo. Requiere Checklist de Seguridad. Temperatura máxima: 50°C.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="thermostat" onclick="addBlock('thermostat')" data-tip="Cambia la temperatura objetivo en cualquier punto del protocolo. Requiere Checklist de Seguridad. Temperatura máxima: 50°C.">
     <div class="pi" style="background:rgba(239,68,68,.12);color:#ef4444"><i class="fa-solid fa-temperature-full"></i></div>
     <div><div class="pn">Fijar Termostato</div><div class="pd">Cambio directo (°C)</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="ramp_temp" onclick="addBlock('ramp_temp')" data-tip="Sube o baja la temperatura gradualmente de un valor inicial a uno final en X minutos. Ideal para heat-shock o aclimatación.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="ramp_temp" onclick="addBlock('ramp_temp')" data-tip="Sube o baja la temperatura gradualmente de un valor inicial a uno final en X minutos. Ideal para heat-shock o aclimatación.">
     <div class="pi" style="background:rgba(244,63,94,.12);color:#f43f5e"><i class="fa-solid fa-arrow-trend-up"></i></div>
     <div><div class="pn">Rampa Térmica</div><div class="pd">Ajuste gradual progresivo</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="led" onclick="addBlock('led')" data-tip="Controla los LEDs de excitación (457–623nm), los LEDs V2 (600nm, 550nm), luz blanca (Blanco) o el láser 650nm. Modos: encender indefinido, pulso por tiempo, o apagar. Potencia máxima recomendada: 0.5 para no quemar el disipador.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="led" onclick="addBlock('led')" data-tip="Controla los LEDs de excitación (457–623nm), los LEDs V2 (600nm, 550nm), luz blanca (Blanco) o el láser 650nm. Modos: encender indefinido, pulso por tiempo, o apagar. Potencia máxima recomendada: 0.5 para no quemar el disipador.">
     <div class="pi" style="background:rgba(251,191,36,.12);color:#fbbf24"><i class="fa-solid fa-lightbulb"></i></div>
     <div><div class="pn">Control LED</div><div class="pd">Pulsos o luz continua</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="uv" onclick="addBlock('uv')" data-tip="Activa la luz UV para inducir estrés genotóxico o mutagénesis. Usar con mucho cuidado — potencias altas son irreversibles. Máx recomendado: 0.3 por períodos cortos.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="uv" onclick="addBlock('uv')" data-tip="Activa la luz UV para inducir estrés genotóxico o mutagénesis. Usar con mucho cuidado — potencias altas son irreversibles. Máx recomendado: 0.3 por períodos cortos.">
     <div class="pi" style="background:rgba(139,92,246,.12);color:#8b5cf6"><i class="fa-solid fa-radiation"></i></div>
     <div><div class="pn">Luz UV</div><div class="pd">Control de estrés</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="laser" onclick="addBlock('laser')" data-tip="Controla el láser 650nm (rojo). Modos: encender indefinido, pulso por tiempo, o apagar. Potencia máxima recomendada: 0.5 para evitar sobrecalentamiento.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="laser" onclick="addBlock('laser')" data-tip="Controla el láser 650nm (rojo). Modos: encender indefinido, pulso por tiempo, o apagar. Potencia máxima recomendada: 0.5 para evitar sobrecalentamiento.">
     <div class="pi" style="background:rgba(220,38,38,.12);color:#dc2626"><i class="fa-solid fa-crosshairs"></i></div>
     <div><div class="pn">Luz Láser</div><div class="pd">Láser 650nm rojo</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="pump" onclick="addBlock('pump')" data-tip="Activa una bomba durante N segundos. Pump1=entrada de medio, Pump2=salida/dilución, Pump3/4=auxiliares. La potencia negativa invierte el flujo. Cuidado con el volumen total.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="pump" onclick="addBlock('pump')" data-tip="Activa una bomba durante N segundos. Pump1=entrada de medio, Pump2=salida/dilución, Pump3/4=auxiliares. La potencia negativa invierte el flujo. Cuidado con el volumen total.">
     <div class="pi" style="background:rgba(59,130,246,.12);color:#3b82f6"><i class="fa-solid fa-droplet"></i></div>
     <div><div class="pn">Dispensar Bomba</div><div class="pd">Inyección temporizada</div></div>
   </div>
 
   <div class="cat"><i class="fa-solid fa-sliders" style="color:var(--text3)"></i>Modos de Control</div>
-  <div class="pill" draggable="true" data-btype="turbidostat" onclick="addBlock('turbidostat')" data-tip="Mantiene la densidad celular (OD) constante diluyendo automáticamente el cultivo con medio fresco. Ideal para evolución adaptativa. Solo un modo de control por experimento.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="turbidostat" onclick="addBlock('turbidostat')" data-tip="Mantiene la densidad celular (OD) constante diluyendo automáticamente el cultivo con medio fresco. Ideal para evolución adaptativa. Solo un modo de control por experimento.">
     <div class="pi" style="background:rgba(34,211,238,.12);color:#22d3ee"><i class="fa-solid fa-chart-line"></i></div>
     <div><div class="pn">Turbidostato</div><div class="pd">Regulación automática OD</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="chemostat" onclick="addBlock('chemostat')" data-tip="Mantiene una tasa de dilución constante (flujo de entrada y salida fijo). p1=tasa Pump1 entrada, p2=tasa Pump2 salida. p2 debe ser ligeramente mayor que p1.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="chemostat" onclick="addBlock('chemostat')" data-tip="Mantiene una tasa de dilución constante (flujo de entrada y salida fijo). p1=tasa Pump1 entrada, p2=tasa Pump2 salida. p2 debe ser ligeramente mayor que p1.">
     <div class="pi" style="background:rgba(236,72,153,.12);color:#ec4899"><i class="fa-solid fa-circle-nodes"></i></div>
     <div><div class="pn">Quimiostato</div><div class="pd">Flujo continuo de medio</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="zigzag" onclick="addBlock('zigzag')" data-tip="Alterna entre OD alto y bajo para estimar la tasa de crecimiento μ en tiempo real. Zig = amplitud de la oscilación en unidades OD. Activa el turbidostato automáticamente.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="zigzag" onclick="addBlock('zigzag')" data-tip="Alterna entre OD alto y bajo para estimar la tasa de crecimiento μ en tiempo real. Zig = amplitud de la oscilación en unidades OD. Activa el turbidostato automáticamente.">
     <div class="pi" style="background:rgba(245,158,11,.12);color:#f59e0b"><i class="fa-solid fa-wave-square"></i></div>
     <div><div class="pn">Zigzag</div><div class="pd">Estimar tasa de crecimiento</div></div>
   </div>
 
   <div class="cat"><i class="fa-solid fa-eye" style="color:var(--text3)"></i>Sensores</div>
-  <div class="pill" draggable="true" data-btype="measure_od" onclick="addBlock('measure_od')" data-tip="Fuerza una lectura del sensor óptico. Pausa el agitador automáticamente 3 segundos para eliminar el ruido de la turbulencia y obtener una lectura limpia.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="measure_od" onclick="addBlock('measure_od')" data-tip="Fuerza una lectura del sensor óptico. Pausa el agitador automáticamente 3 segundos para eliminar el ruido de la turbulencia y obtener una lectura limpia.">
     <div class="pi" style="background:rgba(0,229,160,.12);color:#00e5a0"><i class="fa-solid fa-microscope"></i></div>
     <div><div class="pn">Medir OD</div><div class="pd">Forzar lectura óptica</div></div>
   </div>
 
   <div class="cat"><i class="fa-solid fa-clock" style="color:var(--text3)"></i>Flujo y Lógica</div>
-  <div class="pill" draggable="true" data-btype="wait" onclick="addBlock('wait')" data-tip="Pausa el protocolo por un tiempo. Minutos=basado en ciclos del FSM (seguro). Segundos=bloqueo real (máx 15s). Generaciones=unidad biológica basada en la tasa de crecimiento.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="wait" onclick="addBlock('wait')" data-tip="Pausa el protocolo por un tiempo. Minutos=basado en ciclos del FSM (seguro). Segundos=bloqueo real (máx 15s). Generaciones=unidad biológica basada en la tasa de crecimiento.">
     <div class="pi" style="background:rgba(100,116,139,.12);color:#94a3b8"><i class="fa-solid fa-hourglass-half"></i></div>
     <div><div class="pn">Esperar (Tiempo)</div><div class="pd">Min, Seg o Generaciones</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="loop" onclick="addBlock('loop')" data-tip="Repite una secuencia de bloques N veces. Puedes anidar cualquier bloque dentro. Ideal para protocolos cíclicos como rondas de selección.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="loop" onclick="addBlock('loop')" data-tip="Repite una secuencia de bloques N veces. Puedes anidar cualquier bloque dentro. Ideal para protocolos cíclicos como rondas de selección.">
     <div class="pi" style="background:rgba(245,158,11,.12);color:#f59e0b"><i class="fa-solid fa-repeat"></i></div>
     <div><div class="pn">Bucle</div><div class="pd">Repetir N veces</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="trigger" onclick="addBlock('trigger')" data-tip="Ejecuta bloques solo cuando se cumple una condición (OD, temperatura, tasa de crecimiento, fluorescencia). Modo 'esperar' pausa hasta que se cumpla. Modo 'if' lo evalúa instantáneamente.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="trigger" onclick="addBlock('trigger')" data-tip="Ejecuta bloques solo cuando se cumple una condición (OD, temperatura, tasa de crecimiento, fluorescencia). Modo 'esperar' pausa hasta que se cumpla. Modo 'if' lo evalúa instantáneamente.">
     <div class="pi" style="background:rgba(248,113,113,.12);color:#f87171"><i class="fa-solid fa-bolt"></i></div>
     <div><div class="pn">Trigger Condicional</div><div class="pd">Reactivo a sensores</div></div>
   </div>
-  <div class="pill" draggable="true" data-btype="log" onclick="addBlock('log')" data-tip="Imprime un mensaje en la consola del biorreactor durante la ejecución. Útil para marcar etapas del experimento y depurar el protocolo.">
+  <div class="pill" role="button" tabindex="0" draggable="true" data-btype="log" onclick="addBlock('log')" data-tip="Imprime un mensaje en la consola del biorreactor durante la ejecución. Útil para marcar etapas del experimento y depurar el protocolo.">
     <div class="pi" style="background:rgba(16,185,129,.12);color:#10b981"><i class="fa-solid fa-terminal"></i></div>
     <div><div class="pn">Log en Consola</div><div class="pd">Imprimir mensaje</div></div>
   </div>
@@ -157,7 +157,7 @@
   <!-- ── AI COMMAND BAR ────────────────────────────────────── -->
   <div class="ai-bar" id="ai-bar">
     <i class="fa-solid fa-wand-magic-sparkles ai-icon"></i>
-    <input type="text" id="ai-prompt-input" class="ai-input" placeholder="Ej: Calienta a 37°C, espera 10 min y haz un pulso de luz azul al 20%..." onkeypress="handleAIKeyPress(event)">
+    <input type="text" id="ai-prompt-input" class="ai-input" aria-label="Describe el protocolo para generarlo con IA" placeholder="Ej: Calienta a 37°C, espera 10 min y haz un pulso de luz azul al 20%..." onkeypress="handleAIKeyPress(event)">
     <button class="btn btn-accent" onclick="triggerAIGeneration()" id="ai-btn" data-tip="Generar bloques usando Inteligencia Artificial">
       <i class="fa-solid fa-robot"></i> Generar
     </button>
@@ -225,8 +225,8 @@
 
 <!-- Modal: Block picker -->
 <div class="moverlay" id="modal-picker" onclick="closePicker(event)">
-  <div class="mbox">
-    <h3><i class="fa-solid fa-plus" style="color:var(--accent);margin-right:5px"></i>Añadir bloque interno</h3>
+  <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mt-picker">
+    <h3 id="mt-picker"><i class="fa-solid fa-plus" style="color:var(--accent);margin-right:5px"></i>Añadir bloque interno</h3>
     <div id="picker-list"></div>
     <div class="mfooter"><button class="btn btn-ghost" onclick="closePickerBtn()">Cancelar</button></div>
   </div>
@@ -236,8 +236,8 @@
 
 <!-- Modal: Cloud Config -->
 <div class="moverlay" id="modal-cloud" onclick="if(event.target===this) _closeModal(this)">
-  <div class="mbox">
-    <h3><i class="fa-solid fa-cloud" style="color:#6366f1;margin-right:5px"></i>Estado del Sistema</h3>
+  <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mt-cloud">
+    <h3 id="mt-cloud"><i class="fa-solid fa-cloud" style="color:#6366f1;margin-right:5px"></i>Estado del Sistema</h3>
     <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
       La comunicación con el biorreactor y el asistente de IA se realiza directamente a través del servidor Chi.Bio Nexus.
     </p>
@@ -245,27 +245,27 @@
       <div class="frow"><span class="flbl">Servidor</span><span class="finp" style="background:var(--surface);cursor:default;">chibio.primbiolab.org</span></div>
     </div>
     <div class="mfooter">
-      <button class="btn btn-accent" onclick="document.getElementById('modal-cloud').classList.remove('open')"><i class="fa-solid fa-check"></i> Cerrar</button>
+      <button class="btn btn-accent" onclick="_closeModal(document.getElementById('modal-cloud'))"><i class="fa-solid fa-check"></i> Cerrar</button>
     </div>
   </div>
 </div>
 
 <!-- Modal: Safety -->
 <div class="moverlay" id="modal-safety" onclick="closeSafety(event)">
-  <div class="mbox">
-    <h3><i class="fa-solid fa-shield-halved" style="color:var(--warn);margin-right:5px"></i>Checklist de Seguridad</h3>
+  <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mt-safety">
+    <h3 id="mt-safety"><i class="fa-solid fa-shield-halved" style="color:var(--warn);margin-right:5px"></i>Checklist de Seguridad</h3>
     <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
       Confirma las siguientes condiciones físicas del biorreactor antes de permitir la ejecución del protocolo.
     </p>
-    <div class="cstep" id="cs1" onclick="toggleCS(1)">
+    <div class="cstep" id="cs1" onclick="toggleCS(1)" role="checkbox" aria-checked="false" tabindex="0">
       <div class="ccheck" id="cc1"></div>
       <div class="cstep-txt"><strong>Tubo insertado</strong><br>El tubo de vidrio con líquido está introducido hasta la base térmica.</div>
     </div>
-    <div class="cstep" id="cs2" onclick="toggleCS(2)">
+    <div class="cstep" id="cs2" onclick="toggleCS(2)" role="checkbox" aria-checked="false" tabindex="0">
       <div class="ccheck" id="cc2"></div>
       <div class="cstep-txt"><strong>Anti-Inundación</strong><br>El reactor está posicionado a mayor altura que los frascos de medio y desecho.</div>
     </div>
-    <div class="cstep" id="cs3" onclick="toggleCS(3)" style="display:none;">
+    <div class="cstep" id="cs3" onclick="toggleCS(3)" role="checkbox" aria-checked="false" tabindex="0" style="display:none;">
       <div class="ccheck" id="cc3"></div>
       <div class="cstep-txt"><strong>Calibración Óptica (OD Zero)</strong><br>Se ha realizado la calibración del sensor con medio limpio en la interfaz web original.</div>
     </div>
@@ -280,22 +280,22 @@
 
 <!-- Modal: Pump Calibration -->
 <div class="moverlay" id="modal-pump" onclick="closePumpModal(event)">
-  <div class="mbox">
-    <h3><i class="fa-solid fa-faucet-drip" style="color:#3b82f6;margin-right:5px"></i>Caudales y Volumen Inicial</h3>
+  <div class="mbox" role="dialog" aria-modal="true" aria-labelledby="mt-pump">
+    <h3 id="mt-pump"><i class="fa-solid fa-faucet-drip" style="color:#3b82f6;margin-right:5px"></i>Caudales y Volumen Inicial</h3>
     <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.6">
       Calibra el caudal real de cada bomba y el volumen inicial de líquido en el reactor para calcular volúmenes precisos.
     </p>
     <div style="display:flex;flex-direction:column;gap:8px;">
-      <div class="frow"><span class="flbl">Pump1 (entrada) — ml/min</span><input type="number" id="p_rate1" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><span class="flbl">Pump2 (salida) — ml/min</span><input type="number" id="p_rate2" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><span class="flbl">Pump3 (aux) — ml/min</span><input type="number" id="p_rate3" class="finp" min="0" step="0.1" value="1.0"></div>
-      <div class="frow"><span class="flbl">Pump4 (aux) — ml/min</span><input type="number" id="p_rate4" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate1">Pump1 (entrada) — ml/min</label><input type="number" id="p_rate1" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate2">Pump2 (salida) — ml/min</label><input type="number" id="p_rate2" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate3">Pump3 (aux) — ml/min</label><input type="number" id="p_rate3" class="finp" min="0" step="0.1" value="1.0"></div>
+      <div class="frow"><label class="flbl" for="p_rate4">Pump4 (aux) — ml/min</label><input type="number" id="p_rate4" class="finp" min="0" step="0.1" value="1.0"></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
-      <div class="frow"><span class="flbl">Volumen inicial en reactor — ml</span><input type="number" id="p_init_vol" class="finp" min="0" max="20" step="0.5" value="20.0"></div>
+      <div class="frow"><label class="flbl" for="p_init_vol">Volumen inicial en reactor — ml</label><input type="number" id="p_init_vol" class="finp" min="0" max="20" step="0.5" value="20.0"></div>
     </div>
     <p class="fnote" style="margin-top:8px">El volumen inicial previene estimaciones de desbordamiento cuando el reactor ya tiene líquido al comenzar el protocolo.</p>
     <div class="mfooter">
-      <button class="btn btn-ghost" onclick="document.getElementById('modal-pump').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-ghost" onclick="_closeModal(document.getElementById('modal-pump'))">Cancelar</button>
       <button class="btn btn-accent" onclick="savePumpModal()"><i class="fa-solid fa-check"></i> Guardar</button>
     </div>
   </div>

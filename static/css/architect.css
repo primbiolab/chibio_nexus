@@ -332,3 +332,6 @@ pre#gen-code{flex:1;overflow:auto;padding:12px;margin:0;font-family:var(--mono);
 /* ── EXPORT/IMPORT BAR ───────────────────────────── */
 .io-btns{display:flex;gap:5px;align-items:center;}
 @media (prefers-reduced-motion:reduce){.btn,.rpane,.rtab{transition-duration:0ms;}}
+
+/* ── Foco de teclado visible ── */
+button:focus-visible,[role="button"]:focus-visible,[role="checkbox"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
