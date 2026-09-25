@@ -918,6 +918,30 @@ function applyFPPreset(n){
 }
 function fpManualEdit(n){$('#FPProtein'+n).val('');} // edición manual rompe preset
 function clearTerm(){ajax('/ClearTerminal/'+_selM,null);}
+function copyTerm(){
+  var lines=[];
+  $('#termI .term-group').each(function(){
+    lines.push('['+$(this).find('.term-group-label').text()+']');
+    $(this).find('.term-entry').each(function(){
+      lines.push($(this).find('.term-time').text()+'  '+$(this).find('.term-msg').text());
+    });
+  });
+  if(!lines.length){toast('Terminal vacía','warn');return;}
+  _copyText('Chi.Bio Nexus — Terminal '+_selM+'\n'+lines.join('\n'),'Terminal copiada ✓');
+}
+/* http://192.168.7.2:5000 (LAN) no es contexto seguro: ahí navigator.clipboard no existe. */
+function _copyText(text,okMsg){
+  if(navigator.clipboard&&window.isSecureContext){
+    navigator.clipboard.writeText(text).then(function(){toast(okMsg,'ok');},function(){toast('No se pudo copiar','err');});
+    return;
+  }
+  var ta=document.createElement('textarea');
+  ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  var ok=false; try{ok=document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
+  toast(ok?okMsg:'No se pudo copiar',ok?'ok':'err');
+}
 
 /* ── Terminal — render agrupado por ciclo ───────── */
 function renderTerminal(entries){
