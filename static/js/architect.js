@@ -1465,7 +1465,18 @@ function endTour(){
 // dejando el topbar dim hasta que entra manualmente a Architect.
 
 function clearConsole(){ document.getElementById('console-wrap').innerHTML='<div class="console-empty-msg"><i class="fa-solid fa-shield-halved"></i><span>Motor M.E. listo.</span></div>'; }
-function addMsg(type, icon, html){ const ce=document.getElementById('console-wrap').querySelector('.console-empty-msg'); if(ce) ce.remove(); const d=document.createElement('div'); d.className='cmsg '+type; d.innerHTML=icon+' '; const sp=document.createElement('span'); sp.textContent=html; d.appendChild(sp); document.getElementById('console-wrap').appendChild(d); }
+// El texto se escapa entero (XSS: puede traer nombres de archivo o respuestas del servidor) y
+// solo se re-habilita <strong>, que usan los mensajes del validador. El icono sale del tipo;
+// el 2º argumento (glifo/emoji heredado) se ignora.
+const _MSG_ICO = { ok:'fa-circle-check', err:'fa-circle-xmark', warn:'fa-triangle-exclamation', info:'fa-circle-info' };
+function addMsg(type, _icon, html){
+  const wrap=document.getElementById('console-wrap');
+  const ce=wrap.querySelector('.console-empty-msg'); if(ce) ce.remove();
+  const d=document.createElement('div'); d.className='cmsg '+type;
+  d.innerHTML='<i class="fa-solid '+(_MSG_ICO[type]||'fa-circle-info')+'" aria-hidden="true"></i> ';
+  const sp=document.createElement('span'); sp.innerHTML=esc(html).replace(/&lt;(\/?)strong&gt;/g,'<$1strong>');
+  d.appendChild(sp); wrap.appendChild(d);
+}
 function switchTab(name){
   ['console','code'].forEach(t=>{
     var pane = document.getElementById('rpane-'+t);
