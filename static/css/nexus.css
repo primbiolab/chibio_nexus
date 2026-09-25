@@ -708,7 +708,7 @@ select.field{cursor:pointer;}
 }
 .cam-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;transition:background .3s;}
 .cam-dot.online{background:var(--gr);box-shadow:0 0 6px rgba(0,214,143,.5);}
-.cam-dot.offline{background:#ef4444;}
+.cam-dot.offline{background:var(--rd);}
 .cam-dot.unknown{background:var(--tx3);}
 .cam-ctrl{display:flex;flex-direction:column;gap:5px;}
 .cam-ctrl-label{
@@ -728,8 +728,8 @@ select.field{cursor:pointer;}
 .cam-exp-badge{
   font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
 }
-.cam-exp-badge.running{background:rgba(0,214,143,.15);color:var(--gr);}
-.cam-exp-badge.stopped{background:rgba(239,68,68,.1);color:#ef4444;}
+.cam-exp-badge.running{background:var(--gr-d);color:var(--gr);}
+.cam-exp-badge.stopped{background:var(--rd-d);color:var(--rd);}
 
 /* ── BLOQUEO DE VIEWPORT ESTRECHO ───────────────────────── */
 #viewport-block{
@@ -749,7 +749,8 @@ select.field{cursor:pointer;}
 .vb-box strong{color:#e2e8f0;}
 
 /* ── ESTILOS HEREDADOS DEL ARCHITECT ── */
-.btn-arch-accent { background: #00e5a0 !important; color: #000 !important; border: none !important; font-weight: 700 !important; box-shadow: 0 0 10px rgba(0,229,160,0.2); }
+.btn-arch-accent { background: var(--gr) !important; color: #000 !important; border: none !important; font-weight: 700 !important; box-shadow: var(--gr-g); }
+[data-theme="light"] .btn-arch-accent { color: #fff !important; }
 @media (hover:hover) and (pointer:fine){.btn-arch-accent:hover{filter:brightness(1.1);}}
 .btn-arch-accent:active{transform:scale(0.97);}
 .btn-arch-cloud { background: #6366f1 !important; color: #fff !important; border: none !important; font-weight: 700 !important; }
@@ -757,10 +758,10 @@ select.field{cursor:pointer;}
 .btn-arch-cloud:active:not(:disabled){transform:scale(0.97);}
 .btn-arch-cloud:disabled { background: var(--s3) !important; color: var(--tx3) !important; opacity: 0.5; cursor: not-allowed; box-shadow: none !important; }
 
-.arch-safety { border-color: #ef4444 !important; color: #94a3b8 !important; }
-.arch-safety .sdot { background: #ef4444 !important; box-shadow: none !important; animation: none !important; }
-.arch-safety.on { border-color: #00e5a0 !important; color: #00e5a0 !important; background: rgba(0,229,160,0.1) !important; }
-.arch-safety.on .sdot { background: #00e5a0 !important; box-shadow: 0 0 5px #00e5a0 !important; }
+.arch-safety { border-color: var(--rd) !important; color: var(--tx2) !important; }
+.arch-safety .sdot { background: var(--rd) !important; box-shadow: none !important; animation: none !important; }
+.arch-safety.on { border-color: var(--gr) !important; color: var(--gr) !important; background: var(--gr-d) !important; }
+.arch-safety.on .sdot { background: var(--gr) !important; box-shadow: none !important; }
 
 /* ── Architect Tour — topbar cross-frame overlay ──────────── */
 #topbar.tour-dim::after{
