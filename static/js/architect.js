@@ -405,6 +405,7 @@ function buildBlock(node, step, parentArr, depth){
   const fixed = isFixedBlock(node.type) && parentArr === AST; // singleton en el canvas raíz
 
   const div=document.createElement('div'); div.className='cb'; div.id='cb-'+node.id;
+  div.style.borderLeft='3px solid '+m.col;   // familia del bloque, como el filete de las tarjetas de Nexus
 
   // Los singletons no son arrastrables; los libres sí
   if(!fixed){
@@ -456,11 +457,11 @@ function buildBlock(node, step, parentArr, depth){
     hdr.innerHTML=
       `<div class="cb-step">${step}</div>`+
       `<div class="cb-ico" style="background:${m.col}18;color:${m.col}"><i class="fa-solid ${m.ico}"></i></div>`+
-      `<div class="cb-ttl" style="color:${m.col}">${m.label}</div>`+
+      `<div class="cb-ttl">${m.label}</div>`+
       `<div class="cb-acts"></div>`;
   } else {
     hdr.innerHTML=
-      `<div class="cb-step">${step}</div><div class="cb-ico" style="background:${m.col}18;color:${m.col}"><i class="fa-solid ${m.ico}"></i></div><div class="cb-ttl" style="color:${m.col}">${m.label}</div><i class="fa-solid fa-grip-lines cb-grip"></i><div class="cb-acts">`+
+      `<div class="cb-step">${step}</div><div class="cb-ico" style="background:${m.col}18;color:${m.col}"><i class="fa-solid ${m.ico}"></i></div><div class="cb-ttl">${m.label}</div><i class="fa-solid fa-grip-lines cb-grip"></i><div class="cb-acts">`+
       `<button class="cba clone" title="Duplicar" data-clone="${node.id}"><i class="fa-regular fa-copy"></i></button>`+
       `<button class="cba" title="Subir" data-id="${node.id}" data-dir="-1"><i class="fa-solid fa-chevron-up"></i></button>`+
       `<button class="cba" title="Bajar" data-id="${node.id}" data-dir="1"><i class="fa-solid fa-chevron-down"></i></button>`+

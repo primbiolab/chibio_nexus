@@ -733,7 +733,7 @@ select.field{cursor:pointer;}
 [data-theme="light"] .btn-arch-accent { color: #fff !important; }
 @media (hover:hover) and (pointer:fine){.btn-arch-accent:hover{filter:brightness(1.1);}}
 .btn-arch-accent:active{transform:scale(0.97);}
-.btn-arch-cloud { background: #6366f1 !important; color: #fff !important; border: none !important; font-weight: 700 !important; }
+.btn-arch-cloud { background: #5558e3 !important; color: #fff !important; border: none !important; font-weight: 700 !important; }
 @media (hover:hover) and (pointer:fine){.btn-arch-cloud:hover{background:#4f46e5 !important;}}
 .btn-arch-cloud:active:not(:disabled){transform:scale(0.97);}
 .btn-arch-cloud:disabled { background: var(--s3) !important; color: var(--tx3) !important; opacity: 0.5; cursor: not-allowed; box-shadow: none !important; }
