@@ -65,8 +65,8 @@ input,select{font-family:var(--f-ui);}
 .spill{display:flex;align-items:center;gap:6px;padding:4px 11px;border-radius:var(--rsm);font-family:var(--f-ui);font-weight:700;font-size:11px;flex-shrink:0;border:1px solid var(--rd);color:var(--rd);transition:all .3s;}
 .spill.on{border-color:var(--gr);color:var(--gr);}
 .sdot{width:6px;height:6px;border-radius:50%;background:var(--rd);transition:all .3s;}
-.spill.on .sdot{background:var(--gr);box-shadow:var(--gr-g);animation:blink 1.5s ease infinite;}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+/* Estado normal y estable: punto fijo. El movimiento se reserva para lo anómalo (ISA-101). */
+.spill.on .sdot{background:var(--gr);}
 /* Sin enlace con el servidor: la pastilla de experimento queda congelada y atenuada */
 .spill.stale{opacity:.45;}
 .spill.stale .sdot{animation:none;box-shadow:none;}
@@ -267,8 +267,9 @@ select.field{cursor:pointer;}
 .pump-ct .ib-sm{padding:4px 14px;font-size:11px;}
 
 /* Mode buttons */
-.mb{width:100%;padding:6px 10px;border-radius:var(--rsm);border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f-ui);font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;}
-.mb:hover{background:var(--s3);color:var(--tx);}
+.mb{width:100%;padding:6px 10px;border-radius:var(--rsm);border:1px solid var(--bd2);background:var(--s2);color:var(--tx2);font-family:var(--f-ui);font-size:11.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;}
+@media (hover:hover) and (pointer:fine){.mb:hover{background:var(--s3);color:var(--tx);}}
+.mb:active{transform:scale(0.97);}
 .mb.on{background:var(--gr-d);border-color:var(--gr);color:var(--gr);}
 .mb.on-rd{background:var(--rd-d);border-color:var(--rd);color:var(--rd);}
 .mb.on-am{background:var(--am-d);border-color:var(--am);color:var(--am);}
@@ -287,8 +288,9 @@ select.field{cursor:pointer;}
 
 /* ── TEMP TILES ───────────────────────────────────────────── */
 .temp-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;}
-.ttile{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);padding:7px 4px;text-align:center;cursor:pointer;transition:all .15s;}
-.ttile:hover{border-color:var(--bd2);background:var(--s3);}
+.ttile{background:var(--s2);border:1px solid var(--bd);border-radius:var(--rsm);padding:7px 4px;text-align:center;cursor:pointer;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;}
+@media (hover:hover) and (pointer:fine){.ttile:hover{border-color:var(--bd2);background:var(--s3);}}
+.ttile:active{transform:scale(0.97);}
 .ttile .val{font-family:var(--f-disp);font-size:19px;color:var(--tx);line-height:1;}
 .ttile .sub{font-size:9px;font-weight:700;color:var(--tx3);margin-top:2px;}
 .ttile.hot .val{color:var(--rd);}
@@ -356,9 +358,10 @@ select.field{cursor:pointer;}
   padding:3px 9px;border-radius:var(--rsm);
   background:var(--s2);border:1px solid var(--bd2);
   color:var(--tx3);font-family:var(--f-ui);font-size:10px;font-weight:700;
-  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;
+  cursor:pointer;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;display:flex;align-items:center;gap:4px;
 }
-.cht-tog:hover{color:var(--tx2);background:var(--s3);}
+@media (hover:hover) and (pointer:fine){.cht-tog:hover{color:var(--tx2);background:var(--s3);}}
+.cht-tog:active{transform:scale(0.97);}
 .cht-tog.on{background:var(--gr-d);border-color:var(--gr);color:var(--gr);}
 /* Toggles de sensores de temperatura — color propio */
 .cht-tog.ts.on{
@@ -410,8 +413,7 @@ select.field{cursor:pointer;}
 .term-badge{font-size:8.5px;padding:1px 5px;border-radius:9px;font-weight:600;display:flex;align-items:center;gap:3px;}
 .term-badge-active{color:#4ecb8a;}
 .term-badge-done{color:#5a8a6f;}
-.term-dot{width:5px;height:5px;border-radius:50%;background:#4ecb8a;display:inline-block;animation:term-pulse 1.4s ease-in-out infinite;}
-@keyframes term-pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.term-dot{width:5px;height:5px;border-radius:50%;background:#4ecb8a;display:inline-block;}
 .term-entry{display:flex;gap:7px;padding:1px 7px;align-items:baseline;}
 /* Tonos atenuados de la terminal a >=4.5:1 sobre #050810 (antes 1.4-2.0:1, casi invisibles) */
 .term-time{color:#5a8a6f;font-size:9px;flex-shrink:0;min-width:42px;}
@@ -432,7 +434,9 @@ select.field{cursor:pointer;}
 .fp-card.fp-collapsed .fp-config-wrap{grid-template-rows:0fr;}
 .fp-card.fp-collapsed .fp-config{opacity:0;transform:translateY(-4px);}
 .fp-card.fp-collapsed .fp-head{margin-bottom:4px;}
-@media (prefers-reduced-motion:reduce){.fp-chevron,.fp-config,.fp-config-wrap,.btn,.ib,.dev-btn,.btn-csv,.cpane,.ctab{transition-duration:0ms;}}
+@media (prefers-reduced-motion:reduce){.fp-chevron,.fp-config,.fp-config-wrap,.btn,.ib,.dev-btn,.btn-csv,.cpane,.ctab,.mb,.ttile,.cht-tog,.nexus-tab,.pump-dir-btn,.pump-toggle-thumb{transition-duration:0ms;}
+  .card,.cbox,.cpill.downloading,.cpill.downloading .cloud-ico,.sorb.spin{animation:none;}
+  .ripple-circle{display:none;}}
 .fp-t{font-weight:700;font-size:12px;}
 .fp-sels{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-bottom:5px;}
 .fp-field{display:flex;flex-direction:column;gap:2px;}
@@ -528,14 +532,6 @@ select.field{cursor:pointer;}
 }
 @keyframes rippleExpand {
   to { transform: scale(4); opacity: 0; }
-}
-/* Glow pulsante para botón Run FSM cuando está activo */
-#CustomSwitch.ib-rd {
-  animation: fsmGlowPulse 1.6s ease-in-out infinite;
-}
-@keyframes fsmGlowPulse {
-  0%,100% { box-shadow: 0 0 8px rgba(224,85,85,.4); }
-  50%     { box-shadow: 0 0 22px rgba(224,85,85,.75), 0 0 40px rgba(224,85,85,.3); }
 }
 /* Glow en botones Iniciar y Detener cuando se usa */
 .btn-go { position:relative; overflow:hidden; }
@@ -666,10 +662,11 @@ select.field{cursor:pointer;}
   padding:4px 14px;border-radius:4px;border:none;
   background:transparent;color:var(--tx3);
   font-family:var(--f-ui);font-size:11px;font-weight:700;
-  cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;
+  cursor:pointer;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;display:flex;align-items:center;gap:5px;
   white-space:nowrap;
 }
-.nexus-tab:hover{color:var(--tx2);background:var(--s3);}
+@media (hover:hover) and (pointer:fine){.nexus-tab:hover{color:var(--tx2);background:var(--s3);}}
+.nexus-tab:active{transform:scale(0.97);}
 .nexus-tab.active{background:var(--gr-d);color:var(--gr);border:1px solid var(--gr);}
 .nexus-tab.active i{color:var(--gr);}
 
