@@ -1272,7 +1272,11 @@ function _updateDataInner(data){
     var dir=(data[pk].direction!==undefined)?(data[pk].direction>=0?1:-1):1;
     _pumpDir[pk]=dir;
     var dirBtn=document.getElementById(pk+'Direction');
-    if(dirBtn)dirBtn.classList.toggle('on',dir<0);
+    if(dirBtn){
+      dirBtn.classList.toggle('on',dir<0);
+      dirBtn.setAttribute('aria-pressed',dir<0?'true':'false');
+      dirBtn.querySelector('.pump-dir-lbl').textContent=dir<0?'Invertido':'Normal';
+    }
     /* Input — valor con signo, no pisar mientras el usuario escribe */
     var pin=document.getElementById(pk+'Input');
     if(pin&&document.activeElement!==pin){

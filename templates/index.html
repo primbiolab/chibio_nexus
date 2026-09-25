@@ -177,7 +177,7 @@
         <span class="lbl" style="min-width:62px">Nuevo OD</span>
         <input id="ODInput" type="number" class="num-field" step="0.01">
         <button class="ib ib-gr ib-sm" id="ODSet" onclick="setOD()">Set</button>
-        <button class="ib ib-sm" id="ODMeasure" onclick="measureOD()"><i class="fa-solid fa-flask"></i></button>
+        <button class="ib ib-sm" id="ODMeasure" onclick="measureOD()" title="Medir OD ahora" aria-label="Medir OD ahora"><i class="fa-solid fa-flask"></i></button>
       </div>
       <div class="row">
         <span class="lbl" style="min-width:62px">Vol. ml</span>
@@ -576,35 +576,43 @@
       <div class="pump-grid">
         <div class="pump-row" id="pump-row-1">
           <div class="pump-hdr">
-            <div class="pump-hdr-l"><span class="pump-dot" id="Pump1Dot"></span><i class="fa-solid fa-droplet pump-icon"></i><span class="pump-nm">P1 | ENTRADA</span></div>
-            <label class="pump-toggle"><input type="checkbox" id="Pump1Toggle" onchange="switchPumpToggle('Pump1',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
+            <span class="pump-dot" id="Pump1Dot"></span><span class="pump-id">P1</span><span class="pump-role">Entrada</span>
+            <label class="pump-toggle" title="Encender / apagar P1"><input type="checkbox" id="Pump1Toggle" aria-label="Encender P1 (entrada)" onchange="switchPumpToggle('Pump1',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
           </div>
-          <div class="pump-ct"><button class="ib pump-adj" onclick="adjPump('Pump1',-0.1)">−</button><input type="number" class="led-inp pump-inp" id="Pump1Input" step="0.1" min="-1" max="1" oninput="setPump('Pump1')"><button class="ib pump-adj" onclick="adjPump('Pump1',0.1)">+</button></div>
-          <div class="pump-dir-row"><button class="pump-dir-btn" id="Pump1Direction" onclick="dirPump('Pump1')"><i class="fa-solid fa-rotate"></i></button></div>
+          <div class="pump-ct">
+            <div class="pump-step"><button class="ib pump-adj" aria-label="Bajar potencia de P1" onclick="adjPump('Pump1',-0.1)">−</button><input type="number" class="pump-inp" id="Pump1Input" step="0.1" min="-1" max="1" aria-label="Potencia de P1 (−1 a 1)" oninput="setPump('Pump1')"><button class="ib pump-adj" aria-label="Subir potencia de P1" onclick="adjPump('Pump1',0.1)">+</button></div>
+            <button class="pump-dir-btn" id="Pump1Direction" onclick="dirPump('Pump1')" title="Cambiar el sentido de giro de P1" aria-pressed="false"><i class="fa-solid fa-arrow-right-arrow-left"></i><span class="pump-dir-lbl">Normal</span></button>
+          </div>
         </div>
         <div class="pump-row" id="pump-row-2">
           <div class="pump-hdr">
-            <div class="pump-hdr-l"><span class="pump-dot" id="Pump2Dot"></span><i class="fa-solid fa-droplet pump-icon"></i><span class="pump-nm">P2 | SALIDA</span></div>
-            <label class="pump-toggle"><input type="checkbox" id="Pump2Toggle" onchange="switchPumpToggle('Pump2',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
+            <span class="pump-dot" id="Pump2Dot"></span><span class="pump-id">P2</span><span class="pump-role">Salida</span>
+            <label class="pump-toggle" title="Encender / apagar P2"><input type="checkbox" id="Pump2Toggle" aria-label="Encender P2 (salida)" onchange="switchPumpToggle('Pump2',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
           </div>
-          <div class="pump-ct"><button class="ib pump-adj" onclick="adjPump('Pump2',-0.1)">−</button><input type="number" class="led-inp pump-inp" id="Pump2Input" step="0.1" min="-1" max="1" oninput="setPump('Pump2')"><button class="ib pump-adj" onclick="adjPump('Pump2',0.1)">+</button></div>
-          <div class="pump-dir-row"><button class="pump-dir-btn" id="Pump2Direction" onclick="dirPump('Pump2')"><i class="fa-solid fa-rotate"></i></button></div>
+          <div class="pump-ct">
+            <div class="pump-step"><button class="ib pump-adj" aria-label="Bajar potencia de P2" onclick="adjPump('Pump2',-0.1)">−</button><input type="number" class="pump-inp" id="Pump2Input" step="0.1" min="-1" max="1" aria-label="Potencia de P2 (−1 a 1)" oninput="setPump('Pump2')"><button class="ib pump-adj" aria-label="Subir potencia de P2" onclick="adjPump('Pump2',0.1)">+</button></div>
+            <button class="pump-dir-btn" id="Pump2Direction" onclick="dirPump('Pump2')" title="Cambiar el sentido de giro de P2" aria-pressed="false"><i class="fa-solid fa-arrow-right-arrow-left"></i><span class="pump-dir-lbl">Normal</span></button>
+          </div>
         </div>
         <div class="pump-row" id="pump-row-3">
           <div class="pump-hdr">
-            <div class="pump-hdr-l"><span class="pump-dot" id="Pump3Dot"></span><i class="fa-solid fa-droplet pump-icon"></i><span class="pump-nm">P3 | AUXILIAR</span></div>
-            <label class="pump-toggle"><input type="checkbox" id="Pump3Toggle" onchange="switchPumpToggle('Pump3',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
+            <span class="pump-dot" id="Pump3Dot"></span><span class="pump-id">P3</span><span class="pump-role">Auxiliar</span>
+            <label class="pump-toggle" title="Encender / apagar P3"><input type="checkbox" id="Pump3Toggle" aria-label="Encender P3 (auxiliar)" onchange="switchPumpToggle('Pump3',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
           </div>
-          <div class="pump-ct"><button class="ib pump-adj" onclick="adjPump('Pump3',-0.1)">−</button><input type="number" class="led-inp pump-inp" id="Pump3Input" step="0.1" min="-1" max="1" oninput="setPump('Pump3')"><button class="ib pump-adj" onclick="adjPump('Pump3',0.1)">+</button></div>
-          <div class="pump-dir-row"><button class="pump-dir-btn" id="Pump3Direction" onclick="dirPump('Pump3')"><i class="fa-solid fa-rotate"></i></button></div>
+          <div class="pump-ct">
+            <div class="pump-step"><button class="ib pump-adj" aria-label="Bajar potencia de P3" onclick="adjPump('Pump3',-0.1)">−</button><input type="number" class="pump-inp" id="Pump3Input" step="0.1" min="-1" max="1" aria-label="Potencia de P3 (−1 a 1)" oninput="setPump('Pump3')"><button class="ib pump-adj" aria-label="Subir potencia de P3" onclick="adjPump('Pump3',0.1)">+</button></div>
+            <button class="pump-dir-btn" id="Pump3Direction" onclick="dirPump('Pump3')" title="Cambiar el sentido de giro de P3" aria-pressed="false"><i class="fa-solid fa-arrow-right-arrow-left"></i><span class="pump-dir-lbl">Normal</span></button>
+          </div>
         </div>
         <div class="pump-row" id="pump-row-4">
           <div class="pump-hdr">
-            <div class="pump-hdr-l"><span class="pump-dot" id="Pump4Dot"></span><i class="fa-solid fa-droplet pump-icon"></i><span class="pump-nm">P4 | AUXILIAR</span></div>
-            <label class="pump-toggle"><input type="checkbox" id="Pump4Toggle" onchange="switchPumpToggle('Pump4',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
+            <span class="pump-dot" id="Pump4Dot"></span><span class="pump-id">P4</span><span class="pump-role">Auxiliar</span>
+            <label class="pump-toggle" title="Encender / apagar P4"><input type="checkbox" id="Pump4Toggle" aria-label="Encender P4 (auxiliar)" onchange="switchPumpToggle('Pump4',this.checked)"><span class="pump-toggle-track"><span class="pump-toggle-thumb"></span></span></label>
           </div>
-          <div class="pump-ct"><button class="ib pump-adj" onclick="adjPump('Pump4',-0.1)">−</button><input type="number" class="led-inp pump-inp" id="Pump4Input" step="0.1" min="-1" max="1" oninput="setPump('Pump4')"><button class="ib pump-adj" onclick="adjPump('Pump4',0.1)">+</button></div>
-          <div class="pump-dir-row"><button class="pump-dir-btn" id="Pump4Direction" onclick="dirPump('Pump4')"><i class="fa-solid fa-rotate"></i></button></div>
+          <div class="pump-ct">
+            <div class="pump-step"><button class="ib pump-adj" aria-label="Bajar potencia de P4" onclick="adjPump('Pump4',-0.1)">−</button><input type="number" class="pump-inp" id="Pump4Input" step="0.1" min="-1" max="1" aria-label="Potencia de P4 (−1 a 1)" oninput="setPump('Pump4')"><button class="ib pump-adj" aria-label="Subir potencia de P4" onclick="adjPump('Pump4',0.1)">+</button></div>
+            <button class="pump-dir-btn" id="Pump4Direction" onclick="dirPump('Pump4')" title="Cambiar el sentido de giro de P4" aria-pressed="false"><i class="fa-solid fa-arrow-right-arrow-left"></i><span class="pump-dir-lbl">Normal</span></button>
+          </div>
         </div>
       </div>
     </div>
@@ -620,7 +628,7 @@
         <option value="x1">1x</option><option value="x2">2x</option><option value="x4">8x</option>
         <option value="x6">32x</option><option value="x8">128x</option><option value="x10">512x</option>
       </select>
-      <button class="ib ib-gr ib-sm" id="GetSpectrum" onclick="measureSpectrum()" style="margin-left:5px"><i class="fa-solid fa-atom"></i></button>
+      <button class="ib ib-gr ib-sm" id="GetSpectrum" onclick="measureSpectrum()" title="Medir espectro" aria-label="Medir espectro" style="margin-left:5px"><i class="fa-solid fa-atom"></i></button>
     </div>
     <div class="cb">
       <div class="spec-grid">

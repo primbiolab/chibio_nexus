@@ -175,13 +175,6 @@ input,select{font-family:var(--f-ui);}
 .card.c-bl{border-left-color:var(--bl);}
 .card.c-pu{border-left-color:var(--pu);}
 .card.c-cy{border-left-color:var(--cy);}
-/* Bomba encendida → glow azul */
-.card.pump-on{
-  border-color:rgba(74,158,255,.6);
-  border-left-color:var(--bl);
-  box-shadow:0 0 0 1px rgba(74,158,255,.2), var(--bl-g);
-  background:rgba(74,158,255,.04);
-}
 .ch{display:flex;align-items:center;gap:8px;padding:8px 11px;background:var(--s2);border-bottom:1px solid var(--bd);}
 .ch-ico{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
 .ch-ttl{font-weight:700;font-size:12px;color:var(--tx);flex:1;}
@@ -481,32 +474,40 @@ select.field{cursor:pointer;}
 .led-val{font-family:var(--f-mono);font-size:10.5px;color:var(--tx3);width:28px;text-align:right;flex-shrink:0;}
 
 /* ── DERECHA: BOMBAS ─────────────────────────────────────── */
-.pump-grid{display:flex;flex-direction:column;gap:7px;}
-.pump-row{padding:11px 13px;border-radius:var(--rsm);background:var(--s2);border:1px solid var(--bd);transition:all .25s;}
-.pump-row.on{border-color:rgba(74,158,255,.5);background:rgba(74,158,255,.06);box-shadow:0 0 8px rgba(74,158,255,.12);}
-/* Header */
-.pump-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-.pump-hdr-l{display:flex;align-items:center;gap:6px;}
-.pump-dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex-shrink:0;transition:background .25s;}
-.pump-row.on .pump-dot{background:#4ecb8a;}
-.pump-icon{font-size:10px;color:var(--bl);}
-.pump-nm{font-size:11px;font-weight:700;color:var(--tx);letter-spacing:.03em;}
+.pump-grid{display:flex;flex-direction:column;gap:6px;}
+.pump-row{padding:8px 10px;border-radius:var(--rsm);background:var(--s2);border:1px solid var(--bd);transition:border-color 150ms ease,background-color 150ms ease;}
+.pump-row.on{border-color:var(--bl);background:var(--bl-d);}
+/* Cabecera: estado · id · rol · encendido */
+.pump-hdr{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+.pump-dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex-shrink:0;transition:background-color 150ms ease;}
+.pump-row.on .pump-dot{background:var(--bl);}
+.pump-id{font-family:var(--f-mono);font-size:11px;font-weight:600;color:var(--tx);}
+.pump-role{font-size:11px;font-weight:600;color:var(--tx2);flex:1;}
 /* Toggle switch */
 .pump-toggle{position:relative;display:inline-flex;cursor:pointer;user-select:none;}
 .pump-toggle input{opacity:0;position:absolute;width:0;height:0;}
-.pump-toggle-track{display:block;width:42px;height:22px;background:var(--s3);border-radius:22px;border:1px solid var(--bd2);transition:background .25s,border-color .25s;position:relative;}
-.pump-toggle-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:var(--tx3);border-radius:50%;transition:transform .25s,background .25s;}
+.pump-toggle-track{display:block;width:36px;height:19px;background:var(--s3);border-radius:19px;border:1px solid var(--bd2);transition:background-color 150ms ease,border-color 150ms ease;position:relative;}
+.pump-toggle-thumb{position:absolute;top:2px;left:2px;width:13px;height:13px;background:var(--tx3);border-radius:50%;transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 150ms ease;}
 .pump-toggle input:checked+.pump-toggle-track{background:var(--bl);border-color:var(--bl);}
-.pump-toggle input:checked+.pump-toggle-track .pump-toggle-thumb{transform:translateX(20px);background:#fff;}
-/* Controls row */
-.pump-ct{display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:9px;}
-.pump-adj{padding:5px 18px;font-size:14px;font-weight:700;line-height:1;}
-.pump-inp{width:66px!important;font-size:12px!important;padding:5px 4px!important;border-radius:var(--rsm)!important;border:1px solid var(--bd2)!important;}
-/* Direction button */
-.pump-dir-row{display:flex;justify-content:center;}
-.pump-dir-btn{width:32px;height:32px;border-radius:50%;background:var(--s3);border:1px solid var(--bd2);color:var(--tx3);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
-.pump-dir-btn:hover{border-color:var(--bl);color:var(--bl);}
-.pump-dir-btn.on{background:rgba(74,158,255,.15);border-color:var(--bl);color:var(--bl);}
+.pump-toggle input:checked+.pump-toggle-track .pump-toggle-thumb{transform:translateX(17px);background:#fff;}
+.pump-toggle input:focus-visible+.pump-toggle-track{outline:2px solid var(--bl);outline-offset:2px;}
+/* Control: stepper unido (como los LEDs) + sentido de giro con su estado en texto */
+.pump-ct{display:flex;align-items:center;gap:6px;}
+.pump-step{display:flex;flex:1;min-width:0;}
+.pump-step .pump-adj{padding:4px 10px;font-size:13px;line-height:1;}
+.pump-step .pump-adj:first-child{border-radius:var(--rsm) 0 0 var(--rsm);}
+.pump-step .pump-adj:last-child{border-radius:0 var(--rsm) var(--rsm) 0;}
+.pump-inp{flex:1;min-width:0;width:0;background:var(--s1);border:1px solid var(--bd2);border-left:none;border-right:none;color:var(--tx);
+  font-family:var(--f-mono);font-size:12px;text-align:center;padding:4px 2px;outline:none;color-scheme:light dark;-moz-appearance:textfield;}
+.pump-inp::-webkit-inner-spin-button,.pump-inp::-webkit-outer-spin-button{display:none;}
+.pump-inp:focus{outline:1px solid var(--gr);outline-offset:-1px;}
+.pump-dir-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:94px;padding:4px 9px;border-radius:var(--rsm);flex-shrink:0;
+  background:transparent;border:1px solid var(--bd2);color:var(--tx2);font-family:var(--f-ui);font-size:11px;font-weight:700;cursor:pointer;
+  transition:transform 150ms cubic-bezier(0.23,1,0.32,1),background-color 120ms ease,border-color 120ms ease,color 120ms ease;}
+.pump-dir-btn i{font-size:10px;}
+.pump-dir-btn:active{transform:scale(0.97);}
+@media (hover:hover) and (pointer:fine){.pump-dir-btn:hover{border-color:var(--bl);color:var(--bl);}}
+.pump-dir-btn.on{background:var(--bl-d);border-color:var(--bl);color:var(--bl);}
 /* Legacy — mantener para referencia en charts */
 .pump-tr{display:none;}
 .pump-vl{font-family:var(--f-mono);font-size:10px;color:var(--tx3);}
