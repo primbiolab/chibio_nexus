@@ -423,6 +423,10 @@ def block_csrf():
 def mobile_blocked():
     return render_template('mobile_blocked.html'), 403
 
+@app.errorhandler(404)
+def not_found(e):
+    return render_template('404.html'), 404
+
 @app.route('/')
 def index():
     data = _build_sysdata(_ui_device)

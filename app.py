@@ -839,6 +839,10 @@ def turnEverythingOff(M):
 def mobile_blocked():
     return render_template('mobile_blocked.html'), 403
 
+@application.errorhandler(404)
+def not_found(e):
+    return render_template('404.html'), 404
+
 @application.route('/')
 def index():
     #Function responsible for sending appropriate device's data to user interface. 

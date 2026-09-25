@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chi.Bio Nexus · Ruta no encontrada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&family=Bebas+Neue&display=swap" rel="stylesheet" crossorigin="anonymous">
+<script>
+  (function(){
+    try{ if(localStorage.getItem('chibio-theme')==='light') document.documentElement.setAttribute('data-theme','light'); }catch(e){}
+  })();
+</script>
+<style>
+  /* Mismos tokens que static/css/nexus.css (:root y [data-theme="light"]) */
+  :root{--bg:#0b0e14;--s1:#10141c;--s2:#181e2a;--bd:#253045;--bd2:#2e3a52;--gr:#00d68f;--gr-d:rgba(0,214,143,.13);
+        --tx:#e2ecf8;--tx2:#a0bcd4;--tx3:#6080a0;
+        --f-ui:'Nunito',sans-serif;--f-mono:'IBM Plex Mono',monospace;--f-disp:'Bebas Neue',sans-serif;}
+  [data-theme="light"]{--bg:#e8edf5;--s1:#ffffff;--s2:#f3f5f9;--bd:#b2bdcc;--bd2:#c8d2df;--gr:#00916a;--gr-d:rgba(0,145,106,.12);
+        --tx:#0d1b2e;--tx2:#243554;--tx3:#4e6680;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{background:var(--bg);color:var(--tx);font-family:var(--f-ui);display:flex;align-items:center;justify-content:center;padding:16px;}
+  .box{width:100%;max-width:440px;background:var(--s1);border:1px solid var(--bd);border-left:3px solid var(--gr);border-radius:10px;padding:28px 28px 24px;
+       animation:in 200ms cubic-bezier(0.23,1,0.32,1) both;}
+  @keyframes in{from{opacity:0;}to{opacity:1;}}
+  @media (prefers-reduced-motion:reduce){.box{animation:none;}}
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:22px;}
+  .brand-l1{font-weight:800;font-size:14px;}
+  .brand-l1 span{color:var(--gr);}
+  .brand-l2{font-family:var(--f-mono);font-size:9px;color:var(--tx3);letter-spacing:.6px;}
+  .code{font-family:var(--f-disp);font-size:64px;line-height:1;color:var(--gr);letter-spacing:1px;}
+  .tag{font-family:var(--f-mono);font-size:11px;color:var(--tx2);letter-spacing:.6px;margin:4px 0 16px;}
+  p{font-size:13px;line-height:1.6;color:var(--tx2);}
+  .path{margin:14px 0 20px;padding:7px 10px;background:var(--s2);border:1px solid var(--bd2);border-radius:6px;
+        font-family:var(--f-mono);font-size:12px;color:var(--tx);overflow-wrap:anywhere;}
+  .back{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;background:var(--gr-d);border:1px solid var(--gr);
+        color:var(--gr);font-weight:700;font-size:12px;text-decoration:none;transition:transform 150ms cubic-bezier(0.23,1,0.32,1);}
+  .back:active{transform:scale(0.97);}
+  .back:focus-visible{outline:2px solid var(--gr);outline-offset:2px;}
+</style>
+</head>
+<body>
+<main class="box">
+  <div class="brand">
+    <img id="logo" src="/static/logo.png" alt="Chi.Bio" width="32" height="32" style="object-fit:contain;display:block;">
+    <div><div class="brand-l1">Chi.<span>Bio</span></div><div class="brand-l2">NEXUS &nbsp; v1.0</div></div>
+  </div>
+  <div class="code">404</div>
+  <div class="tag">RUTA NO ENCONTRADA</div>
+  <p>La dirección solicitada no corresponde a ninguna vista del sistema. Esta navegación no envió ninguna orden a los reactores.</p>
+  <div class="path">{{ request.path|truncate(120) }}</div>
+  <a class="back" href="/">&larr; Volver al panel</a>
+</main>
+<script>
+  if(document.documentElement.getAttribute('data-theme')==='light') document.getElementById('logo').src='/static/logo_negro.png';
+</script>
+</body>
+</html>
