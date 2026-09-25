@@ -883,6 +883,33 @@ function toggleFPCollapse(n){
   if(!card)return;
   var collapsed=card.classList.toggle('fp-collapsed');
   localStorage.setItem('fp-collapsed-'+n, collapsed?'1':'0');
+  updateToggleAllFPLabel();
+}
+
+function _anyFPExpanded(){
+  return ['1','2','3'].some(function(n){
+    var card=document.getElementById('fp-card-'+n);
+    return card && !card.classList.contains('fp-collapsed');
+  });
+}
+
+/* Un clic colapsa las 3 si alguna está abierta; si ya estaban todas colapsadas, las expande. */
+function toggleAllFPCollapse(){
+  var anyExpanded=_anyFPExpanded();
+  ['1','2','3'].forEach(function(n){
+    var card=document.getElementById('fp-card-'+n);
+    if(!card)return;
+    if(anyExpanded){card.classList.add('fp-collapsed');}
+    else{card.classList.remove('fp-collapsed');}
+    localStorage.setItem('fp-collapsed-'+n, anyExpanded?'1':'0');
+  });
+  updateToggleAllFPLabel();
+}
+
+function updateToggleAllFPLabel(){
+  var btn=document.getElementById('ToggleAllFP');
+  if(!btn)return;
+  btn.textContent=_anyFPExpanded()?'Colapsar todas':'Expandir todas';
 }
 
 document.addEventListener('DOMContentLoaded',function(){
@@ -892,6 +919,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if(card)card.classList.add('fp-collapsed');
     }
   });
+  updateToggleAllFPLabel();
   // Marcar pane activo inicial como visible (sin animación)
   var activePane = document.querySelector('.cpane.on');
   if(activePane) activePane.classList.add('pane-visible');
