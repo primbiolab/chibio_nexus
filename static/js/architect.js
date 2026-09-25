@@ -319,7 +319,23 @@ function canvasDragOver(e){ e.preventDefault(); document.getElementById('dropzon
 function canvasDragLeave(e){ if(!document.getElementById('canvas').contains(e.relatedTarget)) document.getElementById('dropzone').classList.remove('vis'); }
 function _animateNewBlock(node){
   var el=document.getElementById('cb-'+node.id);
-  if(el){el.classList.add('cb-new');setTimeout(function(){el.classList.remove('cb-new');},800);}
+  if(el){el.classList.add('cb-new');setTimeout(function(){el.classList.remove('cb-new');},250);}
+}
+// Mover un bloque re-renderiza el canvas y los bloques saltaban a su nueva posición sin
+// rastro. FLIP: se mide antes y después y cada bloque que cambió de sitio se desliza 200 ms.
+function _flipMove(fn){
+  const before={};
+  document.querySelectorAll('#canvas .cb').forEach(el=>{ before[el.id]=el.getBoundingClientRect().top; });
+  fn();
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  document.querySelectorAll('#canvas .cb').forEach(el=>{
+    const dy=(before[el.id]!==undefined)?before[el.id]-el.getBoundingClientRect().top:0;
+    if(!dy) return;
+    el.style.transition='none'; el.style.transform='translateY('+dy+'px)';
+    el.offsetHeight;
+    el.style.transition='transform 200ms cubic-bezier(0.23,1,0.32,1)'; el.style.transform='';
+    el.addEventListener('transitionend',()=>{ el.style.transition=''; },{once:true});
+  });
 }
 function canvasDrop(e){
   e.preventDefault(); document.getElementById('dropzone').classList.remove('vis');
@@ -477,7 +493,7 @@ function buildBlock(node, step, parentArr, depth){
       `<button class="cba" title="Subir" data-id="${node.id}" data-dir="-1"><i class="fa-solid fa-chevron-up"></i></button>`+
       `<button class="cba" title="Bajar" data-id="${node.id}" data-dir="1"><i class="fa-solid fa-chevron-down"></i></button>`+
       `<button class="cba del" title="Eliminar" data-del="${node.id}"><i class="fa-solid fa-xmark"></i></button></div>`;
-    hdr.querySelectorAll('.cba[data-dir]').forEach(btn=>btn.addEventListener('click', ()=>{ moveNode(btn.dataset.id, parseInt(btn.dataset.dir)); refresh(); }));
+    hdr.querySelectorAll('.cba[data-dir]').forEach(btn=>btn.addEventListener('click', ()=>{ _flipMove(()=>{ moveNode(btn.dataset.id, parseInt(btn.dataset.dir)); refresh(); }); }));
     hdr.querySelector('.cba[data-del]').addEventListener('click', ()=>{ delNode(hdr.querySelector('[data-del]').dataset.del); refresh(); });
     hdr.querySelector('.cba.clone').addEventListener('click', ()=>{
       const c = cloneNodeDeep(node);
@@ -1642,12 +1658,12 @@ document.addEventListener('keydown', e => {
 
   // Flecha arriba — subir bloque seleccionado
   if(e.key === 'ArrowUp' && _selectedId){
-    e.preventDefault(); moveNode(_selectedId, -1); refresh(); return;
+    e.preventDefault(); _flipMove(()=>{ moveNode(_selectedId, -1); refresh(); }); document.getElementById('cb-'+_selectedId)?.scrollIntoView({block:'nearest'}); return;
   }
 
   // Flecha abajo — bajar bloque seleccionado
   if(e.key === 'ArrowDown' && _selectedId){
-    e.preventDefault(); moveNode(_selectedId, 1); refresh(); return;
+    e.preventDefault(); _flipMove(()=>{ moveNode(_selectedId, 1); refresh(); }); document.getElementById('cb-'+_selectedId)?.scrollIntoView({block:'nearest'}); return;
   }
 
   // Escape — deseleccionar
