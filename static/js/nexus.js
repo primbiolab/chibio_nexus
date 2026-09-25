@@ -331,7 +331,7 @@ var _CHART_COLORS_LIGHT = ['#059669','#dc2626','#7c3aed','#2563eb','#d97706','#0
 
 var _DARK_OPTS = {
   backgroundColor:{fill:'transparent'},
-  chartArea:{backgroundColor:'transparent', left:44, top:28, right:12, bottom:28, width:'100%', height:'100%'},
+  chartArea:{backgroundColor:'transparent', left:44, top:28, right:12, bottom:38, width:'100%', height:'100%'},
   legend:{textStyle:{color:'#a0bcd4',fontSize:10,fontName:'Nunito'},position:'top'},
   hAxis:{ textStyle:{color:'#607d95',fontSize:9,fontName:'Nunito'}, gridlines:{color:'#1e2638',count:4}, minorGridlines:{color:'#151b27'}, baselineColor:'#2a3650' },
   vAxis:{ textStyle:{color:'#607d95',fontSize:9,fontName:'Nunito'}, gridlines:{color:'#1e2638',count:4}, minorGridlines:{color:'#151b27'}, baselineColor:'#2a3650' },
@@ -342,7 +342,7 @@ var _DARK_OPTS = {
 
 var _LIGHT_OPTS = {
   backgroundColor:{fill:'transparent'},
-  chartArea:{backgroundColor:'transparent', left:44, top:28, right:12, bottom:28, width:'100%', height:'100%'},
+  chartArea:{backgroundColor:'transparent', left:44, top:28, right:12, bottom:38, width:'100%', height:'100%'},
   legend:{textStyle:{color:'#334155',fontSize:10,fontName:'Nunito'},position:'top'},
   hAxis:{ textStyle:{color:'#1e3a5f',fontSize:9,fontName:'Nunito'}, gridlines:{color:'#cdd5e0',count:4}, minorGridlines:{color:'#e2e8f0'}, baselineColor:'#94a3b8' },
   vAxis:{ textStyle:{color:'#1e3a5f',fontSize:9,fontName:'Nunito'}, gridlines:{color:'#cdd5e0',count:4}, minorGridlines:{color:'#e2e8f0'}, baselineColor:'#94a3b8' },
@@ -372,7 +372,7 @@ function _parseRecordStr(s){
 if(typeof google!=='undefined'&&google.charts) google.charts.setOnLoadCallback(function(){ if(_lastData) _drawAllCharts(_lastData); });
 
 function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,seriesNames){
-  if(typeof google==='undefined'||!google.visualization||!google.visualization.DataTable)return;
+  if(typeof google==='undefined'||!google.visualization||!google.visualization.DataTable||!google.visualization.LineChart)return;
   var containerId='chart_div'+chartNum;
   var el=document.getElementById(containerId);
   if(!el)return;
@@ -418,7 +418,7 @@ function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,ser
   /* Parsear cada serie UNA vez (antes: se re-parseaba por fila → O(filas²×series)) */
   var parsedSeries=filteredSeries.map(function(s){return _parseRecordStr(s+'');});
   for(var t=0;t<tArr.length;t++){
-    var row=[tArr[t]];
+    var row=[tArr[t]/3600];   // time.record viene en segundos desde el inicio del experimento
     for(var si=0;si<parsedSeries.length;si++){
       var arr=parsedSeries[si];
       row.push(arr[t]!==undefined?arr[t]:null);
@@ -431,6 +431,8 @@ function drawChart2(numSeries,chartNum,times,s1,s2,s3,s4,s5,s6,xLabel,yLabel,ser
   opts.colors=filteredColors;
   opts.vAxis.title=yLabel||'';
   opts.vAxis.titleTextStyle={color:isLight?'#1e3a5f':'#607d95',fontSize:9,fontName:'Nunito'};
+  opts.hAxis.title=xLabel||'';
+  opts.hAxis.titleTextStyle=opts.vAxis.titleTextStyle;
 
   try{
     var chart=new google.visualization.LineChart(el);
@@ -501,20 +503,20 @@ function _drawAllCharts(data){
   if(!data) return;
   var t=data.time.record+'';
   if(_visibleCharts.od)
-    drawChart2(2,2,t,data.OD.record+'',data.OD.targetrecord+'','','','','','Time (h)','OD','OD,Target');
+    drawChart2(2,2,t,data.OD.record+'',data.OD.targetrecord+'','','','','','Tiempo (h)','OD','OD,Objetivo');
   if(_visibleCharts.mu)
-    drawChart2(1,3,t,data.GrowthRate.record+'','','','','','','Time (h)','μ','μ');
+    drawChart2(1,3,t,data.GrowthRate.record+'','','','','','','Tiempo (h)','μ','μ');
   if(_visibleCharts.temp)
-    drawChart2(4,4,t,data.ThermometerIR.record+'',data.Thermostat.record+'',data.ThermometerInternal.record+'',data.ThermometerExternal.record+'','','','Time (h)','°C','IR,Target,Int,Ext');
+    drawChart2(4,4,t,data.ThermometerIR.record+'',data.Thermostat.record+'',data.ThermometerInternal.record+'',data.ThermometerExternal.record+'','','','Tiempo (h)','°C','IR,Target,Int,Ext');
   if(_visibleCharts.pumps)
-    drawChart2(4,1,t,data.Pump1.record+'',data.Pump2.record+'',data.Pump3.record+'',data.Pump4.record+'','','','Time (h)','Flujo','P1,P2,P3,P4');
+    drawChart2(4,1,t,data.Pump1.record+'',data.Pump2.record+'',data.Pump3.record+'',data.Pump4.record+'','','','Tiempo (h)','Flujo','P1,P2,P3,P4');
   var e1b=$('#FPEmit1B').val(),e2b=$('#FPEmit2B').val(),e3b=$('#FPEmit3B').val();
-  if(e1b==='OFF')drawChart2(1,5,t,data.FP1.Emit1Record+'','','','','','','Time (h)','FP1','Em1');
-  else drawChart2(2,5,t,data.FP1.Emit1Record+'',data.FP1.Emit2Record+'','','','','','Time (h)','FP1','Em1,Em2');
-  if(e2b==='OFF')drawChart2(1,6,t,data.FP2.Emit1Record+'','','','','','','Time (h)','FP2','Em1');
-  else drawChart2(2,6,t,data.FP2.Emit1Record+'',data.FP2.Emit2Record+'','','','','','Time (h)','FP2','Em1,Em2');
-  if(e3b==='OFF')drawChart2(1,7,t,data.FP3.Emit1Record+'','','','','','','Time (h)','FP3','Em1');
-  else drawChart2(2,7,t,data.FP3.Emit1Record+'',data.FP3.Emit2Record+'','','','','','Time (h)','FP3','Em1,Em2');
+  if(e1b==='OFF')drawChart2(1,5,t,data.FP1.Emit1Record+'','','','','','','Tiempo (h)','FP1','Em1');
+  else drawChart2(2,5,t,data.FP1.Emit1Record+'',data.FP1.Emit2Record+'','','','','','Tiempo (h)','FP1','Em1,Em2');
+  if(e2b==='OFF')drawChart2(1,6,t,data.FP2.Emit1Record+'','','','','','','Tiempo (h)','FP2','Em1');
+  else drawChart2(2,6,t,data.FP2.Emit1Record+'',data.FP2.Emit2Record+'','','','','','Tiempo (h)','FP2','Em1,Em2');
+  if(e3b==='OFF')drawChart2(1,7,t,data.FP3.Emit1Record+'','','','','','','Tiempo (h)','FP3','Em1');
+  else drawChart2(2,7,t,data.FP3.Emit1Record+'',data.FP3.Emit2Record+'','','','','','Tiempo (h)','FP3','Em1,Em2');
 }
 
 /* ── TOAST MANAGER PREMIUM ────────────────────────────────── */
