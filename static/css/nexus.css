@@ -67,6 +67,15 @@ input,select{font-family:var(--f-ui);}
 .sdot{width:6px;height:6px;border-radius:50%;background:var(--rd);transition:all .3s;}
 .spill.on .sdot{background:var(--gr);box-shadow:var(--gr-g);animation:blink 1.5s ease infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+/* Sin enlace con el servidor: la pastilla de experimento queda congelada y atenuada */
+.spill.stale{opacity:.45;}
+.spill.stale .sdot{animation:none;box-shadow:none;}
+.lpill{display:none;align-items:center;gap:6px;padding:4px 11px;border-radius:var(--rsm);font-family:var(--f-ui);font-weight:700;font-size:11px;flex-shrink:0;
+  background:var(--am-d);border:1px solid var(--am);color:var(--am);cursor:pointer;transition:transform 150ms cubic-bezier(0.23,1,0.32,1);}
+.lpill.show{display:flex;animation:lpillIn 160ms cubic-bezier(0.23,1,0.32,1);}
+.lpill:active{transform:scale(0.97);}
+@keyframes lpillIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.lpill.show{animation:none;}}
 
 /* Cloud pill — animación azul pulsante cuando descarga */
 .cpill{display:flex;align-items:center;gap:5px;padding:4px 11px;border-radius:var(--rsm);font-family:var(--f-ui);font-weight:700;font-size:11px;flex-shrink:0;border:1px solid var(--bd);color:var(--tx3);transition:all .4s;position:relative;overflow:hidden;}

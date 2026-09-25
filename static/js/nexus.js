@@ -11,6 +11,8 @@ function _setSelM(M){ _selM = M; try{ sessionStorage.setItem('chibio_selM', M); 
 var _pollInterval = 2000;
 var _pollTimer    = null;
 var _pollBusy     = false;
+var _lastOkAt     = Date.now();   // última respuesta válida de /getSysdata/
+var _pollFails    = 0;            // fallos seguidos del sondeo
 
 function _pollTick() {
   clearTimeout(_pollTimer); _pollTimer = null;
@@ -19,8 +21,8 @@ function _pollTick() {
   _pollBusy = true;
   $.ajax({
     type: 'GET', url: '/getSysdata/'+_selM, dataType: 'json', timeout: 5000,
-    success: function(data) { _pollInterval = 2000; updateData(data); _updateCloudPill(data.cloud); },
-    error:   function() { _pollInterval = Math.min(_pollInterval * 2, 30000); },
+    success: function(data) { _pollInterval = 2000; _lastOkAt = Date.now(); _pollFails = 0; _updateLinkPill(); updateData(data); _updateCloudPill(data.cloud); },
+    error:   function() { _pollInterval = Math.min(_pollInterval * 2, 30000); _pollFails++; },
     complete:function() { _pollBusy = false; _pollTimer = setTimeout(_pollTick, _pollInterval); }
   });
 }
@@ -30,6 +32,22 @@ document.addEventListener('visibilitychange', function() {
 });
 
 _pollTick();
+
+/* Sin enlace con el servidor, los valores en pantalla son de la última lectura válida:
+   avisarlo en vez de dejar "Ejecutando" parpadeando como si todo estuviera en vivo. */
+function _updateLinkPill(){
+  var p=document.getElementById('link-pill');
+  if(!p)return;
+  var age=Math.round((Date.now()-_lastOkAt)/1000);
+  var lost=_pollFails>0&&age>=5;
+  p.classList.toggle('show',lost);
+  $('#exp-pill').toggleClass('stale',lost);
+  if(!lost)return;
+  $('#link-pill-text').text('Sin enlace · '+(age<60?age+' s':Math.floor(age/60)+' min'));
+  p.title='Última lectura válida: '+new Date(_lastOkAt).toTimeString().slice(0,8)+'. Los valores en pantalla pueden estar desactualizados. Clic para reintentar ahora.';
+}
+setInterval(_updateLinkPill,1000);
+function retryPoll(){ _pollInterval=2000; _pollTick(); }
 
 // ── Nexus Tab Navigation ──────────────────────────────────
 var _nexusTab = 'main';
