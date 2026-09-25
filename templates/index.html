@@ -92,13 +92,13 @@
   <!-- ── Controles contextuales del ARCHITECT ── -->
   <div id="ctx-architect" style="display:none;align-items:center;gap:6px;flex:1;">
     <div class="tb-sep"></div>
-    <button id="arch-caudales-btn" class="btn btn-ghost" onclick="archCmd('openPumpModal')" style="font-size:11px;padding:4px 10px;">
-      <i class="fa-solid fa-faucet-drip" style="color:#3b82f6"></i> Caudales
+    <button id="arch-caudales-btn" class="btn btn-ghost" onclick="archCmd('openPumpModal')" style="font-size:11px;padding:4px 10px;" title="Caudales y volumen inicial" aria-label="Caudales y volumen inicial">
+      <i class="fa-solid fa-faucet-drip" style="color:#3b82f6"></i><span class="tb-lbl-sm"> Caudales</span>
     </button>
     <div class="tb-sep"></div>
     
     <div id="arch-reactor-group" style="display:flex;align-items:center;gap:6px;">
-      <span class="tb-text" style="font-size:11px; font-family:var(--f-ui); font-weight:700;">Reactor:</span>
+      <span class="tb-text tb-lbl-sm" style="font-size:11px; font-family:var(--f-ui); font-weight:700;">Reactor:</span>
       <select id="arch-reactor" class="field fsm" style="width:52px; font-size:11px; font-family:var(--f-ui); font-weight:700; padding:3px 5px;" onchange="archCmd('setReactor', this.value)" aria-label="Reactor del Architect">
         <option>M0</option><option selected>M1</option><option>M2</option><option>M3</option>
         <option>M4</option><option>M5</option><option>M6</option><option>M7</option>
@@ -112,12 +112,12 @@
 
     <div id="arch-export-group" style="margin-left:auto;display:flex;align-items:center;gap:6px;">
       <div id="arch-export-btns" style="display:flex;align-items:center;gap:4px;">
-        <button class="btn btn-ghost" onclick="archCmd('export')" style="padding:5px 9px;"><i class="fa-solid fa-file-export" style="color:#10b981"></i> Exportar</button>
-        <button class="btn btn-ghost" onclick="document.getElementById('arch-import-file').click()" style="padding:5px 9px;"><i class="fa-solid fa-file-import" style="color:#60a5fa"></i> Importar</button>
+        <button class="btn btn-ghost" onclick="archCmd('export')" style="padding:5px 9px;" title="Exportar experimento" aria-label="Exportar experimento"><i class="fa-solid fa-file-export" style="color:#10b981"></i><span class="tb-lbl-sm"> Exportar</span></button>
+        <button class="btn btn-ghost" onclick="document.getElementById('arch-import-file').click()" style="padding:5px 9px;" title="Importar experimento" aria-label="Importar experimento"><i class="fa-solid fa-file-import" style="color:#60a5fa"></i><span class="tb-lbl-sm"> Importar</span></button>
         <input type="file" id="arch-import-file" accept=".chibio,.json" style="display:none" onchange="handleArchImport(event)">
       </div>
       <div class="tb-sep"></div>
-      <button id="arch-tour-btn" class="btn btn-ghost" onclick="archCmd('tour')" style="padding:5px 9px;"><i class="fa-solid fa-circle-question" style="color:#f59e0b"></i> Tour</button>
+      <button id="arch-tour-btn" class="btn btn-ghost" onclick="archCmd('tour')" style="padding:5px 9px;" title="Tour del Architect" aria-label="Tour del Architect"><i class="fa-solid fa-circle-question" style="color:#f59e0b"></i><span class="tb-lbl-sm"> Tour</span></button>
       <div class="tb-sep"></div>
       <div id="arch-hist-btns" style="display:flex;align-items:center;gap:4px;">
         <button class="btn btn-ghost" onclick="archCmd('undo')" style="padding:5px 9px;" title="Deshacer"><i class="fa-solid fa-rotate-left"></i></button>
