@@ -8,7 +8,7 @@
   --bl:#4a9eff; --bl-d:rgba(74,158,255,.13); --bl-g:0 0 16px rgba(74,158,255,.35);
   --pu:#a78bfa; --pu-d:rgba(167,139,250,.13); --pu-g:0 0 18px rgba(167,139,250,.5);
   --cy:#22d3ee; --cy-d:rgba(34,211,238,.13);
-  --tx:#e2ecf8; --tx2:#a0bcd4; --tx3:#6080a0;
+  --tx:#e2ecf8; --tx2:#a0bcd4; --tx3:#7090b0;
   --f-ui:'Nunito',sans-serif;
   --f-mono:'IBM Plex Mono',monospace;
   --f-disp:'Bebas Neue',sans-serif;
@@ -23,8 +23,8 @@
   /* Bordes más definidos */
   --bd:#b2bdcc; --bd2:#c8d2df;
   /* Acentos más saturados */
-  --gr:#00916a; --gr-d:rgba(0,145,106,.12); --gr-g:0 0 14px rgba(0,145,106,.22);
-  --am:#b87200; --am-d:rgba(184,114,0,.12);
+  --gr:#007a58; --gr-d:rgba(0,122,88,.12); --gr-g:0 0 14px rgba(0,122,88,.22);
+  --am:#955c00; --am-d:rgba(149,92,0,.12);
   --rd:#c41e2a; --rd-d:rgba(196,30,42,.10);
   --bl:#1a58d0; --bl-d:rgba(26,88,208,.12); --bl-g:0 0 16px rgba(26,88,208,.28);
   --pu:#6420cc; --pu-d:rgba(100,32,204,.10); --pu-g:0 0 18px rgba(100,32,204,.28);
@@ -121,6 +121,7 @@ input,select{font-family:var(--f-ui);}
 .btn-ghost{background:transparent;border:1px solid var(--bd);color:var(--tx2);}
 @media (hover:hover) and (pointer:fine){.btn-ghost:hover{background:var(--s2);border-color:var(--bd2);color:var(--tx);}}
 .btn-go{background:var(--gr);color:#000;box-shadow:var(--gr-g);}
+[data-theme="light"] .btn-go{color:#fff;}
 @media (hover:hover) and (pointer:fine){.btn-go:hover{filter:brightness(1.1);}}
 .btn-stop{background:var(--rd-d);border:1px solid var(--rd);color:var(--rd);}
 .btn-scan{background:var(--bl-d);border:1px solid var(--bl);color:var(--bl);}
@@ -376,11 +377,11 @@ select.field{cursor:pointer;}
 .cbox svg { background: transparent !important; }
 .cbox > div > div { background: transparent !important; }
 .cbox > div { background: transparent !important; }
-/* Texto de ejes y leyenda en Google Charts → color claro */
-.cbox text { fill: #a0bcd4 !important; font-family: "Nunito", sans-serif !important; }
+/* Texto de ejes y leyenda en Google Charts → token de texto (cambia con el tema) */
+.cbox text { fill: var(--tx2) !important; font-family: "Nunito", sans-serif !important; }
 /* Líneas de grid → muy tenues */
 .cbox line, .cbox rect[fill="#ffffff"], .cbox rect[fill="white"] {
-  stroke: #253045 !important;
+  stroke: var(--bd) !important;
 }
 .cbox-t{font-size:10.5px;font-weight:700;color:var(--tx2);margin-bottom:4px;display:flex;align-items:center;gap:5px;flex-shrink:0;}
 .cbox>div[id^="chart_div"]{flex:1;min-height:0;width:100%;}
@@ -416,7 +417,7 @@ select.field{cursor:pointer;}
 .term-time{color:#5a8a6f;font-size:9px;flex-shrink:0;min-width:42px;}
 .term-msg{color:#4ecb8a;font-size:10px;word-break:break-word;}
 .term-msg-dim{color:#5a8a6f;font-size:9.5px;}
-.term-empty{color:#1a2e1e;font-size:10px;display:block;text-align:center;padding:24px 0;}
+.term-empty{color:#5a8a6f;font-size:10px;display:block;text-align:center;padding:24px 0;}
 
 /* ── FP PANELS ───────────────────────────────────────────── */
 .fp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
