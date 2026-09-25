@@ -124,6 +124,10 @@ input,select{font-family:var(--f-ui);}
 @media (hover:hover) and (pointer:fine){.btn-go:hover{filter:brightness(1.1);}}
 .btn-stop{background:var(--rd-d);border:1px solid var(--rd);color:var(--rd);}
 .btn-scan{background:var(--bl-d);border:1px solid var(--bl);color:var(--bl);}
+/* Mantener presionado para confirmar (Reset): el relleno avanza lineal y vuelve rápido al soltar */
+.btn-hold .hold-fill{position:absolute;inset:0;background:var(--rd-d);clip-path:inset(0 100% 0 0);transition:clip-path 200ms cubic-bezier(0.23,1,0.32,1);pointer-events:none;}
+.btn-hold.holding .hold-fill{clip-path:inset(0 0 0 0);transition:clip-path 1200ms linear;}
+.btn-hold.holding{border-color:var(--rd);color:var(--rd);}
 
 
 

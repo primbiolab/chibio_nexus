@@ -766,6 +766,22 @@ function stopExperiment(){
   });
   if(window._customOn){ window._customOn=false; toggleCustom(); }
 }
+/* Reset reinicia la configuración del experimento y está al lado de Detener: se confirma
+   manteniendo presionado 1.2 s (ratón o Enter/Espacio), no con un clic que se escapa. */
+(function(){
+  var b=document.getElementById('ExperimentReset'); if(!b)return;
+  var HOLD=1200, t=null;
+  function start(){ if(t)return; b.classList.add('holding'); t=setTimeout(function(){ t=null; b.classList.remove('holding'); resetExperiment(); },HOLD); }
+  function cancel(){
+    if(!t)return;
+    clearTimeout(t); t=null; b.classList.remove('holding');
+    spawnToast('info','fa-solid fa-hand-pointer','Mantén presionado','Mantén presionado Reset para reiniciar el experimento.',2500);
+  }
+  b.addEventListener('pointerdown',function(e){ if(e.button===0)start(); });
+  ['pointerup','pointerleave','pointercancel'].forEach(function(ev){ b.addEventListener(ev,cancel); });
+  b.addEventListener('keydown',function(e){ if((e.key==='Enter'||e.key===' ')&&!e.repeat){ e.preventDefault(); start(); } });
+  b.addEventListener('keyup',function(e){ if(e.key==='Enter'||e.key===' ')cancel(); });
+})();
 function resetExperiment(){ajax('/ExperimentReset/'+_selM,null);spawnToast('warn','fa-solid fa-rotate-left','Reset','Todos los parámetros han sido reiniciados.', 3500);}
 function setOD(){var v=_numVal('#ODInput','OD objetivo'); if(v!==null) ajax('/SetOutputTarget/OD/'+_selM+'/'+v,null);}
 function measureOD(){ajax('/MeasureOD/'+_selM,null);}
@@ -1625,7 +1641,7 @@ var MAIN_TOUR_STEPS = [
     pos:'bottom' },
   { sel:'#main-action-btns',
     title:'Control del experimento',
-    desc:'Iniciar activa el protocolo FSM cargado. Detener lo pausa sin perder los datos registrados. Reset devuelve todos los parámetros al estado inicial — ideal para preparar un experimento nuevo desde cero.',
+    desc:'Iniciar activa el protocolo FSM cargado. Detener lo pausa sin perder los datos registrados. Reset (mantenlo presionado un segundo) devuelve todos los parámetros al estado inicial — ideal para preparar un experimento nuevo desde cero.',
     pos:'bottom' },
   { sel:'#global-buttons',
     title:'Tema visual y tour',
