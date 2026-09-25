@@ -946,10 +946,21 @@ function toggleAllFPCollapse(){
 }
 
 function updateToggleAllFPLabel(){
+  ['1','2','3'].forEach(function(n){
+    var card=document.getElementById('fp-card-'+n), cb=document.getElementById('fp-chevbtn-'+n);
+    if(card&&cb)cb.setAttribute('aria-expanded',card.classList.contains('fp-collapsed')?'false':'true');
+  });
   var btn=document.getElementById('ToggleAllFP');
   if(!btn)return;
   btn.textContent=_anyFPExpanded()?'Colapsar todas':'Expandir todas';
 }
+
+/* Elementos clicables que no son <button> (casillas de temperatura, insignia de seguridad):
+   Enter/Espacio los activan igual que un clic. */
+document.addEventListener('keydown',function(e){
+  var t=e.target;
+  if(t&&t.getAttribute&&t.getAttribute('role')==='button'&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); t.click(); }
+});
 
 document.addEventListener('DOMContentLoaded',function(){
   ['1','2','3'].forEach(function(n){

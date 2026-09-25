@@ -99,14 +99,14 @@
     
     <div id="arch-reactor-group" style="display:flex;align-items:center;gap:6px;">
       <span class="tb-text" style="font-size:11px; font-family:var(--f-ui); font-weight:700;">Reactor:</span>
-      <select id="arch-reactor" class="field fsm" style="width:52px; font-size:11px; font-family:var(--f-ui); font-weight:700; padding:3px 5px;" onchange="archCmd('setReactor', this.value)">
+      <select id="arch-reactor" class="field fsm" style="width:52px; font-size:11px; font-family:var(--f-ui); font-weight:700; padding:3px 5px;" onchange="archCmd('setReactor', this.value)" aria-label="Reactor del Architect">
         <option>M0</option><option selected>M1</option><option>M2</option><option>M3</option>
         <option>M4</option><option>M5</option><option>M6</option><option>M7</option>
       </select>
     </div>
 
     <div class="tb-sep"></div>
-    <div id="arch-safety-badge" class="spill arch-safety" style="cursor:pointer;font-size:10px;padding:4px 10px;" onclick="archCmd('openSafety')">
+    <div id="arch-safety-badge" class="spill arch-safety" style="cursor:pointer;font-size:10px;padding:4px 10px;" onclick="archCmd('openSafety')" role="button" tabindex="0">
       <div class="sdot"></div><span id="arch-safety-text"><i class="fa-solid fa-lock" style="font-size:9px;margin-right:2px"></i>Seguridad</span>
     </div>
 
@@ -175,14 +175,14 @@
       <!-- FIX: num-field con padding-right para no tapar valor con spinner -->
       <div class="row">
         <span class="lbl" style="min-width:62px">Nuevo OD</span>
-        <input id="ODInput" type="number" class="num-field" step="0.01">
-        <button class="ib ib-gr ib-sm" id="ODSet" onclick="setOD()">Set</button>
+        <input id="ODInput" type="number" class="num-field" step="0.01" aria-label="Nuevo OD objetivo">
+        <button class="ib ib-gr ib-sm" id="ODSet" onclick="setOD()" aria-label="Aplicar OD objetivo">Set</button>
         <button class="ib ib-sm" id="ODMeasure" onclick="measureOD()" title="Medir OD ahora" aria-label="Medir OD ahora"><i class="fa-solid fa-flask"></i></button>
       </div>
       <div class="row">
         <span class="lbl" style="min-width:62px">Vol. ml</span>
-        <input id="VolumeInput" type="number" class="num-field" min="0" max="20" step="0.5">
-        <button class="ib ib-sm" onclick="setVolume()">Set</button>
+        <input id="VolumeInput" type="number" class="num-field" min="0" max="20" step="0.5" aria-label="Volumen (ml)">
+        <button class="ib ib-sm" onclick="setVolume()" aria-label="Aplicar volumen">Set</button>
       </div>
       <div class="sec">Modo de control</div>
       <button class="mb" id="ODRegulate" onclick="toggleODRegulate()"><i class="fa-solid fa-chart-line"></i> Turbidostato</button>
@@ -210,8 +210,8 @@
     <div class="cal-body collapsed" id="cal-body">
       <div style="padding:10px 11px;display:flex;flex-direction:column;gap:7px;">
         <p style="font-size:11px;color:var(--tx3);line-height:1.5;">Introduce el <strong style="color:var(--tx2)">Raw medido</strong> y el <strong style="color:var(--tx2)">OD real</strong> (espectrofotómetro externo).</p>
-        <div class="row"><span class="lbl" style="min-width:70px">Raw medido</span><input id="OD0Input" type="number" class="num-field"></div>
-        <div class="row"><span class="lbl" style="min-width:70px">OD real</span><input id="OD0Actual" type="number" class="num-field"></div>
+        <div class="row"><span class="lbl" style="min-width:70px">Raw medido</span><input id="OD0Input" type="number" class="num-field" aria-label="Calibración: raw medido"></div>
+        <div class="row"><span class="lbl" style="min-width:70px">OD real</span><input id="OD0Actual" type="number" class="num-field" aria-label="Calibración: OD real"></div>
         <button class="mb" id="OD0Set" onclick="calibrateOD()"><i class="fa-solid fa-crosshairs"></i> Calibrar OD Zero</button>
       </div>
     </div>
@@ -222,16 +222,16 @@
     <div class="ch"><div class="ch-ico" style="background:var(--rd-d);color:var(--rd)"><i class="fa-solid fa-temperature-half"></i></div><span class="ch-ttl">Temperatura</span></div>
     <div class="cb">
       <div class="temp-g">
-        <div class="ttile" onclick="measureTemp('External')"><div class="val" id="TempCurrent">—</div><div class="sub">EXT</div></div>
-        <div class="ttile" onclick="measureTemp('Internal')"><div class="val" id="TempCurrent2">—</div><div class="sub">INT</div></div>
-        <div class="ttile hot" onclick="measureTemp('IR')"><div class="val" id="TempCurrent3">—</div><div class="sub">IR LÍQ</div></div>
+        <div class="ttile" onclick="measureTemp('External')" role="button" tabindex="0" title="Medir temperatura exterior" aria-label="Medir temperatura exterior"><div class="val" id="TempCurrent">—</div><div class="sub">EXT</div></div>
+        <div class="ttile" onclick="measureTemp('Internal')" role="button" tabindex="0" title="Medir temperatura interior" aria-label="Medir temperatura interior"><div class="val" id="TempCurrent2">—</div><div class="sub">INT</div></div>
+        <div class="ttile hot" onclick="measureTemp('IR')" role="button" tabindex="0" title="Medir temperatura del líquido (IR)" aria-label="Medir temperatura del líquido (IR)"><div class="val" id="TempCurrent3">—</div><div class="sub">IR LÍQ</div></div>
       </div>
       <!-- FIX: num-field para que spinner no tape el valor -->
       <div class="row">
         <span class="lbl" style="min-width:62px">Target °C</span>
         <span style="font-family:var(--f-mono);font-size:11px;font-weight:700;color:var(--rd);flex-shrink:0;min-width:30px" id="ThermostatTarget">37°</span>
-        <input id="ThermostatInput" type="number" class="num-field">
-        <button class="ib ib-sm" onclick="setThermostat()">Set</button>
+        <input id="ThermostatInput" type="number" class="num-field" aria-label="Nueva temperatura objetivo (°C)">
+        <button class="ib ib-sm" onclick="setThermostat()" aria-label="Aplicar temperatura objetivo">Set</button>
       </div>
       <button class="mb" id="ThermostatSwitch" onclick="toggleThermostat()"><i class="fa-solid fa-fire"></i> Termostato</button>
     </div>
@@ -252,8 +252,8 @@
       <!-- Input y Set en su propia fila limpia -->
       <div class="row" style="gap:7px;">
         <span class="lbl" style="min-width:68px;font-size:11px;">Nueva vel.</span>
-        <input id="StirInput" type="number" class="num-field" step="0.1" min="0" max="1" style="flex:1">
-        <button class="ib ib-sm" onclick="setStir()">Set</button>
+        <input id="StirInput" type="number" class="num-field" step="0.1" min="0" max="1" style="flex:1" aria-label="Nueva velocidad de agitación (0 a 1)">
+        <button class="ib ib-sm" onclick="setStir()" aria-label="Aplicar velocidad de agitación">Set</button>
       </div>
       <button class="mb" id="StirSwitch" onclick="toggleStir()"><i class="fa-solid fa-fan"></i> Agitador</button>
     </div>
@@ -329,12 +329,12 @@
         <div style="flex:1;min-width:200px;display:flex;flex-direction:column;gap:7px;">
           <div class="row" style="gap:4px">
             <span class="lbl">Slot</span>
-            <select class="field fsm" id="CustomProgram1" style="flex:0 0 58px;width:58px" onchange="updateCustomFieldUI()">
+            <select class="field fsm" id="CustomProgram1" style="flex:0 0 58px;width:58px" onchange="updateCustomFieldUI()" aria-label="Slot del programa Custom">
               <option value="C1">C1</option><option value="C2">C2</option><option value="C3">C3</option>
               <option value="C4">C4</option><option value="C5">C5</option><option value="C6">C6</option>
               <option value="C7">C7</option><option value="C8" selected>C8</option>
             </select>
-            <input id="CustomInput" type="number" class="num-field" value="0" style="flex:1;min-width:0;width:0" oninput="validateCustomInput()">
+            <input id="CustomInput" type="number" class="num-field" value="0" style="flex:1;min-width:0;width:0" oninput="validateCustomInput()" aria-label="Parámetro del programa Custom">
           </div>
           <div id="custom-field-hint" class="custom-hint">
             <i class="fa-solid fa-circle-info"></i>
@@ -365,11 +365,11 @@
           </div>
           <div class="fp-grid">
           <div class="fp-card" id="fp-card-1">
-            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('1')"><span class="fp-t">FP1</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP1Switch" onclick="event.stopPropagation();toggleFP('FP1')">On</button><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-1"></i></div></div>
+            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('1')"><span class="fp-t">FP1</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP1Switch" onclick="event.stopPropagation();toggleFP('FP1')">On</button><button class="fp-chev-btn" id="fp-chevbtn-1" aria-expanded="true" aria-label="Mostrar u ocultar la configuración de FP1" onclick="event.stopPropagation();toggleFPCollapse('1')"><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-1"></i></button></div></div>
             <div class="fp-config-wrap"><div class="fp-config" id="fp-config-1">
             <div class="fp-field fp-preset">
               <span class="fp-field-lbl">Proteína</span>
-              <select class="field fsm" id="FPProtein1" onchange="applyFPPreset('1')">
+              <select class="field fsm" id="FPProtein1" onchange="applyFPPreset('1')" aria-label="Proteína de FP1">
                 <option value="" selected>Personalizado</option>
                 <option value="GFP">GFP</option>
                 <option value="YFP">YFP</option>
@@ -379,23 +379,23 @@
               </select>
             </div>
             <div class="fp-sels">
-              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite1" onchange="fpManualEdit('1')"><option value="LEDB">457nm</option><option value="LEDC">500nm</option><option value="LEDD">523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain1"><option value="x1">1x</option><option value="x2">2x</option><option value="x4">4x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase1" onchange="fpManualEdit('1')"><option value="CLEAR">Clear</option><option value="nm470">470nm</option><option value="nm510">510nm</option><option value="nm550">550nm</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit1A" onchange="fpManualEdit('1')"><option value="nm510">510nm</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite1" onchange="fpManualEdit('1')" aria-label="Excitación de FP1"><option value="LEDB">457nm</option><option value="LEDC">500nm</option><option value="LEDD">523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain1" aria-label="Ganancia de FP1"><option value="x1">1x</option><option value="x2">2x</option><option value="x4">4x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase1" onchange="fpManualEdit('1')" aria-label="Banda base de FP1"><option value="CLEAR">Clear</option><option value="nm470">470nm</option><option value="nm510">510nm</option><option value="nm550">550nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit1A" onchange="fpManualEdit('1')" aria-label="Emisión 1 de FP1"><option value="nm510">510nm</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option></select></div>
             </div>
-            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit1B" style="width:100%" onchange="fpManualEdit('1')"><option value="OFF">Em2: OFF</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
+            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit1B" style="width:100%" onchange="fpManualEdit('1')" aria-label="Emisión 2 de FP1"><option value="OFF">Em2: OFF</option><option value="nm550">550nm</option><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
             </div></div>
             <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp1-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase1Value">—</span></div>
             <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp1-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit1AValue">—</span></div>
             <div class="fp-br"><span class="fp-l">Em2</span><div class="fp-tr"><div class="fp-fi" id="fp1-em2" style="width:0%"></div></div><span class="fp-v" id="FPEmit1BValue">—</span></div>
           </div>
           <div class="fp-card" id="fp-card-2">
-            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('2')"><span class="fp-t">FP2</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP2Switch" onclick="event.stopPropagation();toggleFP('FP2')">On</button><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-2"></i></div></div>
+            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('2')"><span class="fp-t">FP2</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP2Switch" onclick="event.stopPropagation();toggleFP('FP2')">On</button><button class="fp-chev-btn" id="fp-chevbtn-2" aria-expanded="true" aria-label="Mostrar u ocultar la configuración de FP2" onclick="event.stopPropagation();toggleFPCollapse('2')"><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-2"></i></button></div></div>
             <div class="fp-config-wrap"><div class="fp-config" id="fp-config-2">
             <div class="fp-field fp-preset">
               <span class="fp-field-lbl">Proteína</span>
-              <select class="field fsm" id="FPProtein2" onchange="applyFPPreset('2')">
+              <select class="field fsm" id="FPProtein2" onchange="applyFPPreset('2')" aria-label="Proteína de FP2">
                 <option value="" selected>Personalizado</option>
                 <option value="RFP">RFP / DsRed</option>
                 <option value="mCherry">mCherry</option>
@@ -403,35 +403,35 @@
               </select>
             </div>
             <div class="fp-sels">
-              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite2" onchange="fpManualEdit('2')"><option value="LEDD" selected>523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain2"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase2" onchange="fpManualEdit('2')"><option value="CLEAR">Clear</option><option value="nm550">550nm</option><option value="nm583">583nm</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit2A" onchange="fpManualEdit('2')"><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite2" onchange="fpManualEdit('2')" aria-label="Excitación de FP2"><option value="LEDD" selected>523nm</option><option value="LEDF">623nm</option><option value="LASER650">Láser</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain2" aria-label="Ganancia de FP2"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase2" onchange="fpManualEdit('2')" aria-label="Banda base de FP2"><option value="CLEAR">Clear</option><option value="nm550">550nm</option><option value="nm583">583nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit2A" onchange="fpManualEdit('2')" aria-label="Emisión 1 de FP2"><option value="nm583">583nm</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
             </div>
-            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit2B" style="width:100%" onchange="fpManualEdit('2')"><option value="OFF">Em2: OFF</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
+            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit2B" style="width:100%" onchange="fpManualEdit('2')" aria-label="Emisión 2 de FP2"><option value="OFF">Em2: OFF</option><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
             </div></div>
             <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp2-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase2Value">—</span></div>
             <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp2-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit2AValue">—</span></div>
             <div class="fp-br"><span class="fp-l">Em2</span><div class="fp-tr"><div class="fp-fi" id="fp2-em2" style="width:0%"></div></div><span class="fp-v" id="FPEmit2BValue">—</span></div>
           </div>
           <div class="fp-card" id="fp-card-3">
-            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('3')"><span class="fp-t">FP3</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP3Switch" onclick="event.stopPropagation();toggleFP('FP3')">On</button><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-3"></i></div></div>
+            <div class="fp-head fp-head-toggle" onclick="toggleFPCollapse('3')"><span class="fp-t">FP3</span><div style="display:flex;align-items:center;gap:6px"><button class="ib ib-sm" id="FP3Switch" onclick="event.stopPropagation();toggleFP('FP3')">On</button><button class="fp-chev-btn" id="fp-chevbtn-3" aria-expanded="true" aria-label="Mostrar u ocultar la configuración de FP3" onclick="event.stopPropagation();toggleFPCollapse('3')"><i class="fa-solid fa-chevron-up fp-chevron" id="fp-chev-3"></i></button></div></div>
             <div class="fp-config-wrap"><div class="fp-config" id="fp-config-3">
             <div class="fp-field fp-preset">
               <span class="fp-field-lbl">Proteína</span>
-              <select class="field fsm" id="FPProtein3" onchange="applyFPPreset('3')">
+              <select class="field fsm" id="FPProtein3" onchange="applyFPPreset('3')" aria-label="Proteína de FP3">
                 <option value="" selected>Personalizado</option>
                 <option value="mCherry">mCherry</option>
                 <option value="Cy5">Cy5 (lejano-rojo)</option>
               </select>
             </div>
             <div class="fp-sels">
-              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite3" onchange="fpManualEdit('3')"><option value="LEDF" selected>623nm</option><option value="LASER650">Láser</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain3"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase3" onchange="fpManualEdit('3')"><option value="CLEAR">Clear</option><option value="nm620">620nm</option></select></div>
-              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit3A" onchange="fpManualEdit('3')"><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Excitación</span><select class="field fsm" id="FPExcite3" onchange="fpManualEdit('3')" aria-label="Excitación de FP3"><option value="LEDF" selected>623nm</option><option value="LASER650">Láser</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Ganancia</span><select class="field fsm" id="FPGain3" aria-label="Ganancia de FP3"><option value="x1">1x</option><option value="x6">32x</option><option value="x8">128x</option><option value="x10" selected>512x</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Banda base</span><select class="field fsm" id="FPBase3" onchange="fpManualEdit('3')" aria-label="Banda base de FP3"><option value="CLEAR">Clear</option><option value="nm620">620nm</option></select></div>
+              <div class="fp-field"><span class="fp-field-lbl">Emisión 1</span><select class="field fsm" id="FPEmit3A" onchange="fpManualEdit('3')" aria-label="Emisión 1 de FP3"><option value="nm620">620nm</option><option value="nm670">670nm</option></select></div>
             </div>
-            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit3B" style="width:100%" onchange="fpManualEdit('3')"><option value="OFF">Em2: OFF</option><option value="nm670">670nm</option></select></div>
+            <div class="fp-field" style="margin-bottom:7px"><span class="fp-field-lbl">Emisión 2 (opcional)</span><select class="field fsm" id="FPEmit3B" style="width:100%" onchange="fpManualEdit('3')" aria-label="Emisión 2 de FP3"><option value="OFF">Em2: OFF</option><option value="nm670">670nm</option></select></div>
             </div></div>
             <div class="fp-br"><span class="fp-l">Base</span><div class="fp-tr"><div class="fp-fi" id="fp3-base" style="width:0%;background:var(--tx3)"></div></div><span class="fp-v" id="FPBase3Value">—</span></div>
             <div class="fp-br"><span class="fp-l">Em1</span><div class="fp-tr"><div class="fp-fi" id="fp3-em1" style="width:0%"></div></div><span class="fp-v" id="FPEmit3AValue">—</span></div>
@@ -497,73 +497,73 @@
         <!-- --led-rgb en cada fila controla el color del toggle y del borde cuando está on -->
         <div class="led-row" id="led-row-LEDB" style="--led-rgb:30,64,175">
           <div class="led-name-box"><div class="led-dot" style="background:#1e40af"></div><span class="led-name">457 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDB',-0.1)">−</button><input type="number" class="led-inp" id="LEDBInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDB',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDBSet" onclick="setLED('LEDB')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDB',-0.1)" aria-label="Bajar 457 nm">−</button><input type="number" class="led-inp" id="LEDBInput" aria-label="Intensidad 457 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDB',0.1)" aria-label="Subir 457 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDBSet" onclick="setLED('LEDB')" aria-label="Aplicar intensidad 457 nm">Set</button>
           <span class="led-val" id="LEDBCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:30,64,175"><input type="checkbox" id="LEDB-tog" onchange="switchLED('LEDB',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:30,64,175"><input type="checkbox" id="LEDB-tog" aria-label="Encender 457 nm" onchange="switchLED('LEDB',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDC" style="--led-rgb:13,148,136">
           <div class="led-name-box"><div class="led-dot" style="background:#0d9488"></div><span class="led-name">500 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDC',-0.1)">−</button><input type="number" class="led-inp" id="LEDCInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDC',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDCSet" onclick="setLED('LEDC')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDC',-0.1)" aria-label="Bajar 500 nm">−</button><input type="number" class="led-inp" id="LEDCInput" aria-label="Intensidad 500 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDC',0.1)" aria-label="Subir 500 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDCSet" onclick="setLED('LEDC')" aria-label="Aplicar intensidad 500 nm">Set</button>
           <span class="led-val" id="LEDCCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:13,148,136"><input type="checkbox" id="LEDC-tog" onchange="switchLED('LEDC',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:13,148,136"><input type="checkbox" id="LEDC-tog" aria-label="Encender 500 nm" onchange="switchLED('LEDC',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDD" style="--led-rgb:21,128,61">
           <div class="led-name-box"><div class="led-dot" style="background:#15803d"></div><span class="led-name">523 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDD',-0.1)">−</button><input type="number" class="led-inp" id="LEDDInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDD',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDDSet" onclick="setLED('LEDD')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDD',-0.1)" aria-label="Bajar 523 nm">−</button><input type="number" class="led-inp" id="LEDDInput" aria-label="Intensidad 523 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDD',0.1)" aria-label="Subir 523 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDDSet" onclick="setLED('LEDD')" aria-label="Aplicar intensidad 523 nm">Set</button>
           <span class="led-val" id="LEDDCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:21,128,61"><input type="checkbox" id="LEDD-tog" onchange="switchLED('LEDD',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:21,128,61"><input type="checkbox" id="LEDD-tog" aria-label="Encender 523 nm" onchange="switchLED('LEDD',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDF" style="--led-rgb:185,28,28">
           <div class="led-name-box"><div class="led-dot" style="background:#b91c1c"></div><span class="led-name">623 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDF',-0.1)">−</button><input type="number" class="led-inp" id="LEDFInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDF',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDFSet" onclick="setLED('LEDF')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDF',-0.1)" aria-label="Bajar 623 nm">−</button><input type="number" class="led-inp" id="LEDFInput" aria-label="Intensidad 623 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDF',0.1)" aria-label="Subir 623 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDFSet" onclick="setLED('LEDF')" aria-label="Aplicar intensidad 623 nm">Set</button>
           <span class="led-val" id="LEDFCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:185,28,28"><input type="checkbox" id="LEDF-tog" onchange="switchLED('LEDF',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:185,28,28"><input type="checkbox" id="LEDF-tog" aria-label="Encender 623 nm" onchange="switchLED('LEDF',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDG" style="--led-rgb:203,213,225;display:none">
           <div class="led-name-box"><div class="led-dot" style="background:#cbd5e1;border:1px solid var(--bd)"></div><span class="led-name">6500 K</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDG',-0.1)">−</button><input type="number" class="led-inp" id="LEDGInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDG',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDGSet" onclick="setLED('LEDG')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDG',-0.1)" aria-label="Bajar 6500 K">−</button><input type="number" class="led-inp" id="LEDGInput" aria-label="Intensidad 6500 K (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDG',0.1)" aria-label="Subir 6500 K">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDGSet" onclick="setLED('LEDG')" aria-label="Aplicar intensidad 6500 K">Set</button>
           <span class="led-val" id="LEDGCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:203,213,225"><input type="checkbox" id="LEDG-tog" onchange="switchLED('LEDG',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:203,213,225"><input type="checkbox" id="LEDG-tog" aria-label="Encender 6500 K" onchange="switchLED('LEDG',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDH" style="--led-rgb:220,120,60;display:none">
           <div class="led-name-box"><div class="led-dot" style="background:#dc7c3c"></div><span class="led-name">600 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDH',-0.1)">−</button><input type="number" class="led-inp" id="LEDHInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDH',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDHSet" onclick="setLED('LEDH')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDH',-0.1)" aria-label="Bajar 600 nm">−</button><input type="number" class="led-inp" id="LEDHInput" aria-label="Intensidad 600 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDH',0.1)" aria-label="Subir 600 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDHSet" onclick="setLED('LEDH')" aria-label="Aplicar intensidad 600 nm">Set</button>
           <span class="led-val" id="LEDHCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:220,120,60"><input type="checkbox" id="LEDH-tog" onchange="switchLED('LEDH',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:220,120,60"><input type="checkbox" id="LEDH-tog" aria-label="Encender 600 nm" onchange="switchLED('LEDH',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDI" style="--led-rgb:100,180,80;display:none">
           <div class="led-name-box"><div class="led-dot" style="background:#64b450"></div><span class="led-name">550 nm</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDI',-0.1)">−</button><input type="number" class="led-inp" id="LEDIInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDI',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDISet" onclick="setLED('LEDI')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDI',-0.1)" aria-label="Bajar 550 nm">−</button><input type="number" class="led-inp" id="LEDIInput" aria-label="Intensidad 550 nm (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDI',0.1)" aria-label="Subir 550 nm">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDISet" onclick="setLED('LEDI')" aria-label="Aplicar intensidad 550 nm">Set</button>
           <span class="led-val" id="LEDICurrent">0.00</span>
-          <label class="tog" style="--led-rgb:100,180,80"><input type="checkbox" id="LEDI-tog" onchange="switchLED('LEDI',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:100,180,80"><input type="checkbox" id="LEDI-tog" aria-label="Encender 550 nm" onchange="switchLED('LEDI',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LEDV" style="--led-rgb:240,240,220;display:none">
           <div class="led-name-box"><div class="led-dot" style="background:#f0f0dc;border:1px solid var(--bd)"></div><span class="led-name">Blanco</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDV',-0.1)">−</button><input type="number" class="led-inp" id="LEDVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDV',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LEDVSet" onclick="setLED('LEDV')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LEDV',-0.1)" aria-label="Bajar Blanco">−</button><input type="number" class="led-inp" id="LEDVInput" aria-label="Intensidad Blanco (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LEDV',0.1)" aria-label="Subir Blanco">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LEDVSet" onclick="setLED('LEDV')" aria-label="Aplicar intensidad Blanco">Set</button>
           <span class="led-val" id="LEDVCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:240,240,220"><input type="checkbox" id="LEDV-tog" onchange="switchLED('LEDV',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:240,240,220"><input type="checkbox" id="LEDV-tog" aria-label="Encender Blanco" onchange="switchLED('LEDV',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-LASER650" style="--led-rgb:220,38,38">
           <div class="led-name-box"><div class="led-dot" style="background:#dc2626"></div><span class="led-name">Láser 650</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LASER650',-0.1)">−</button><input type="number" class="led-inp" id="LASER650Input" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LASER650',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="LASER650Set" onclick="setLED('LASER650')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('LASER650',-0.1)" aria-label="Bajar Láser 650">−</button><input type="number" class="led-inp" id="LASER650Input" aria-label="Intensidad Láser 650 (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('LASER650',0.1)" aria-label="Subir Láser 650">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="LASER650Set" onclick="setLED('LASER650')" aria-label="Aplicar intensidad Láser 650">Set</button>
           <span class="led-val" id="LASER650Current">0.00</span>
-          <label class="tog" style="--led-rgb:220,38,38"><input type="checkbox" id="LASER650-tog" onchange="switchLED('LASER650',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:220,38,38"><input type="checkbox" id="LASER650-tog" aria-label="Encender Láser 650" onchange="switchLED('LASER650',this.checked)"><span class="tog-t"></span></label>
         </div>
         <div class="led-row" id="led-row-UV" style="--led-rgb:109,40,217">
           <div class="led-name-box"><div class="led-dot" style="background:#6d28d9"></div><span class="led-name">UV 280</span></div>
-          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('UV',-0.1)">−</button><input type="number" class="led-inp" id="UVInput" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('UV',0.1)">+</button></div>
-          <button class="ib ib-sm led-set-btn" id="UVSet" onclick="setLED('UV')">Set</button>
+          <div class="led-ctrls"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:var(--rsm) 0 0 var(--rsm);border-right:none;" onclick="adjLED('UV',-0.1)" aria-label="Bajar UV 280">−</button><input type="number" class="led-inp" id="UVInput" aria-label="Intensidad UV 280 (0 a 1)" step="0.1" min="0" max="1"><button class="ib ib-sm" style="padding:2px 4px;font-size:10px;border-radius:0 var(--rsm) var(--rsm) 0;border-left:none;" onclick="adjLED('UV',0.1)" aria-label="Subir UV 280">+</button></div>
+          <button class="ib ib-sm led-set-btn" id="UVSet" onclick="setLED('UV')" aria-label="Aplicar intensidad UV 280">Set</button>
           <span class="led-val" id="UVCurrent">0.00</span>
-          <label class="tog" style="--led-rgb:109,40,217"><input type="checkbox" id="UV-tog" onchange="switchLED('UV',this.checked)"><span class="tog-t"></span></label>
+          <label class="tog" style="--led-rgb:109,40,217"><input type="checkbox" id="UV-tog" aria-label="Encender UV 280" onchange="switchLED('UV',this.checked)"><span class="tog-t"></span></label>
         </div>
       </div>
     </div>
@@ -624,7 +624,7 @@
     <div class="ch">
       <div class="ch-ico" style="background:var(--pu-d);color:var(--pu)"><i class="fa-solid fa-chart-bar"></i></div>
       <span class="ch-ttl">Espectrómetro AS7341</span>
-      <select class="field fsm" id="SpectrumGain" style="width:54px;margin-left:auto">
+      <select class="field fsm" id="SpectrumGain" style="width:54px;margin-left:auto" aria-label="Ganancia del espectrómetro">
         <option value="x1">1x</option><option value="x2">2x</option><option value="x4">8x</option>
         <option value="x6">32x</option><option value="x8">128x</option><option value="x10">512x</option>
       </select>
@@ -671,15 +671,15 @@
       </div>
       <div class="cam-ctrl">
         <div class="cam-ctrl-label"><span>Brillo</span><span id="cam-brightness-val">1.00</span></div>
-        <input type="range" id="cam-brightness" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+        <input type="range" id="cam-brightness" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()" aria-label="Brillo de la cámara">
       </div>
       <div class="cam-ctrl">
         <div class="cam-ctrl-label"><span>Contraste</span><span id="cam-contrast-val">1.00</span></div>
-        <input type="range" id="cam-contrast" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+        <input type="range" id="cam-contrast" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()" aria-label="Contraste de la cámara">
       </div>
       <div class="cam-ctrl">
         <div class="cam-ctrl-label"><span>Saturación</span><span id="cam-saturation-val">1.00</span></div>
-        <input type="range" id="cam-saturation" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()">
+        <input type="range" id="cam-saturation" min="0.5" max="2.0" step="0.05" value="1.0" oninput="onCamSlider()" aria-label="Saturación de la cámara">
       </div>
       <div class="cam-info-row">
         <span class="cam-info-label">Peers WebRTC</span>
@@ -732,7 +732,7 @@
 <div id="nexus-tour-highlight"></div>
 <div id="nexus-topbar-dim-left"></div>
 <div id="nexus-topbar-dim-right"></div>
-<div id="toasts"></div>
+<div id="toasts" role="status" aria-live="polite"></div>
 
 <script src="{{ url_for('static', filename='js/nexus.js') }}"></script>
 </body>
