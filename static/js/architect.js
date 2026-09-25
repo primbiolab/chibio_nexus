@@ -1059,7 +1059,20 @@ function highlight(code){
     KW.forEach(k=>{ h=h.replace(new RegExp('\\b'+k+'\\b','g'),'<span class="py-kw">'+k+'</span>'); }); h=h.replace(/\b([a-zA-Z_]\w*)\s*\(/g,'<span class="py-fn">$1</span>('); return h;
   }).join('\n');
 }
-function copyCode(){ navigator.clipboard.writeText(rawPythonCode).then(()=>toast('Código copiado ✓','ok')); }
+function copyCode(){
+  if(!rawPythonCode){ toast('No hay código compilado','warn'); return; }
+  if(navigator.clipboard && window.isSecureContext){
+    navigator.clipboard.writeText(rawPythonCode).then(()=>toast('Código copiado ✓','ok'),()=>toast('No se pudo copiar','err'));
+    return;
+  }
+  // http://192.168.7.2:5000 (LAN) no es contexto seguro: ahí navigator.clipboard no existe.
+  const ta=document.createElement('textarea');
+  ta.value=rawPythonCode; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.select();
+  let ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  toast(ok?'Código copiado ✓':'No se pudo copiar', ok?'ok':'err');
+}
 
 // ── EXPORT / IMPORT ───────────────────────────────────────────
 function exportExperiment(){
