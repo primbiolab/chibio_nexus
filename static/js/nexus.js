@@ -1027,6 +1027,10 @@ function _copyText(text,okMsg){
 function renderTerminal(entries){
   var el=document.getElementById('termI');
   if(!el)return;
+  // El sondeo llega cada 2 s: re-renderizar solo si cambió, o se pierde la selección de texto
+  var key=JSON.stringify(entries||[]);
+  if(el._termKey===key)return;
+  el._termKey=key;
   if(!Array.isArray(entries)||entries.length===0){
     el.innerHTML='<span class="term-empty">Sin actividad registrada</span>';
     return;
