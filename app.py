@@ -801,9 +801,39 @@ def initialiseAll():
         initialise(M)
     
     scanDevices("all")
-    
-  
-    
+
+
+def _reactorResponde(M):
+    # Sondeo sin tocar sysData[M]['present']: scanDevices lo pone a 1 antes de probar y, en esa
+    # ventana, otro hilo podría hablarle a un reactor inexistente y tumbar el proceso (os._exit en I2CCom).
+    with lock:
+        try:
+            sysItems['Multiplexer']['device'].write8(0x00, int(sysItems['Multiplexer'][M], 2))
+            sysDevices[M]['ThermometerInternal']['device'].readU16(0x05, 0)
+            return True
+        except Exception:
+            return False
+        finally:
+            try:
+                sysItems['Multiplexer']['device'].write8(0x00, 0x00)
+            except Exception:
+                pass
+
+
+def _buscarReactores():
+    # Si un reactor no respondía al arrancar (placa o reactor aún sin energía) o se desconectó,
+    # quedaba ausente hasta reiniciar gunicorn y los actuadores respondían 204 sin hacer nada.
+    while True:
+        time.sleep(30)
+        for M in ['M0','M1','M2','M3','M4','M5','M6','M7']:
+            if sysData[M]['present'] == 0 and _reactorResponde(M):
+                print(str(datetime.now()) + ' [NEXUS] ' + M + ' detectado en caliente, inicializando')
+                try:
+                    initialise(M)
+                except Exception as e:
+                    print(str(datetime.now()) + ' [NEXUS] Error inicializando ' + M + ': ' + str(e))
+
+
 def turnEverythingOff(M):
     # Function which turns off all actuation/hardware.
     for LED in ['LEDB','LEDC','LEDD','LEDF','LEDG','LEDH','LEDI','LEDV']:
@@ -2916,6 +2946,7 @@ def injectProtocol():
 
 
 initialiseAll()
+Thread(target=_buscarReactores, daemon=True).start()
 
 if __name__ == '__main__':
     application.run(debug=False, threaded=True, host='192.168.7.2', port=5000)
