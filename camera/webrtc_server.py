@@ -195,11 +195,16 @@ class CameraCapture:
         cap = cv2.VideoCapture(self.index, cv2.CAP_V4L2)  # Linux: V4L2 nativo
         if not cap.isOpened():
             cap = cv2.VideoCapture(self.index)              # fallback genérico (Windows: MSMF/DSHOW auto)
+        # MJPG antes que tamaño/FPS: en V4L2 los FPS se negocian con el formato vigente,
+        # y con YUYV la BRIO tope 1280x720 a 10 FPS.
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
         cap.set(cv2.CAP_PROP_FPS,          self.fps)
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        # En V4L2 un solo búfer deja a la cámara sin dónde escribir mientras se lee: FPS a la mitad.
+        # El ring buffer ya entrega siempre el frame más reciente.
+        if cap.getBackendName() != "V4L2":
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         actual_fps = cap.get(cv2.CAP_PROP_FPS)
         actual_w   = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         actual_h   = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
