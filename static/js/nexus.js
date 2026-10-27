@@ -216,7 +216,7 @@ window.addEventListener('message', function(e){
     }
   }
   if(e.data.type === 'setVolume'){
-    var v=Math.min(20,Math.max(0,parseFloat(e.data.val)||0));
+    var v=Math.min(30,Math.max(0,parseFloat(e.data.val)||0));
     window._lastSyncedVolume=v;
     $('#VolumeInput').val(v);
     ajax('/SetOutputTarget/Volume/'+_selM+'/'+v,null);

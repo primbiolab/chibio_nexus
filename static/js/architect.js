@@ -1078,6 +1078,8 @@ async function sendToReactor() {
         });
         const data = await resp.json();
         if(!resp.ok || data.error) throw new Error(data.error || 'Error ' + resp.status);
+        // El volumen del modal de bombas viaja con el protocolo (un Reset en Main lo devuelve a 20)
+        if(window.parent !== window) window.parent.postMessage({ type:'setVolume', val:globalInitVol }, window.location.origin);
         toast("¡Protocolo enviado al Biorreactor!", "ok");
         addMsg("ok", "🚀", "Protocolo guardado en el reactor. Se ejecutará en el próximo ciclo.");
     } catch(e) {
