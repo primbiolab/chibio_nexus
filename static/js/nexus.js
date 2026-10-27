@@ -689,11 +689,10 @@ async function analyzeProtocol(){
       body: JSON.stringify({}),
       signal: ctrl.signal
     });
-    if(!resp.ok) throw new Error('Error ' + resp.status);
-    var data = await resp.json();
-    if(data.error) throw new Error(data.error);
-
+    var data = await resp.json().catch(function(){ return {}; });
     document.getElementById('proto-raw-code').textContent = data.code || '—';
+    if(!resp.ok) throw new Error(data.error || ('Error ' + resp.status));
+    if(data.error) throw new Error(data.error);
 
     var html = (data.analysis || 'Sin respuesta.').split('\n')
       .filter(function(l){ return l.trim(); })

@@ -2817,6 +2817,7 @@ def analyzeProtocol():
     """
     import hashlib as _hashlib
     import os as _os
+    code = None   # si Gemini falla, el código igual se devuelve para que se vea qué protocolo hay
     try:
         client_ip = _client_ip()
         if not _gemini_rate_ok(client_ip):
@@ -2858,7 +2859,7 @@ def analyzeProtocol():
 
     except Exception as e:
         print(str(datetime.now()) + ' [NEXUS] Error en analyzeProtocol: ' + str(e))
-        return jsonify({'error': 'No se pudo analizar el protocolo'}), 500
+        return jsonify({'error': 'No se pudo analizar el protocolo', 'code': code}), 500
 
 
 @application.route('/generateProtocol/', methods=['POST'])
