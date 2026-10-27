@@ -225,7 +225,7 @@ def _build_sysdata(device_id: str) -> dict:
         'ThermometerInternal': {'current': round(temp_now - 0.5, 3), 'record': t_int_rec},
         'ThermometerIR'      : {'current': round(temp_now, 3),       'record': t_ir_rec},
 
-        'Volume': {'target': 20.0, 'max': 20.0, 'min': 0.0, 'ON': 0},
+        'Volume': {'target': 20.0, 'max': 30.0, 'min': 0.0, 'ON': 0},
 
         'Stir': {
             'target' : cfg['stir'] if running else 0.0,

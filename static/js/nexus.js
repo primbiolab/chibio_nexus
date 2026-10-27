@@ -773,7 +773,7 @@ function calibrateOD(){
   ajax('/CalibrateOD/OD0/'+_selM+'/'+raw+'/'+act,null);
 }
 function setVolume(){
-  var v=Math.min(20,Math.max(0,parseFloat($('#VolumeInput').val())||0));
+  var v=Math.min(30,Math.max(0,parseFloat($('#VolumeInput').val())||0));
   $('#VolumeInput').val(v);
   ajax('/SetOutputTarget/Volume/'+_selM+'/'+v,null);
   archCmd('setVolume',v);
