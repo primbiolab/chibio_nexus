@@ -223,7 +223,9 @@ sysData = {'M0' : {
    'ThermometerExternal' : {'current' : 0.0,'record' : []},
    'ThermometerIR' : {'current' : 0.0,'record' : []},
    'OD' :  {'current' : 0.0,'target' : 0.5,'default' : 0.5,'max': 10, 'min' : 0,'record' : [],'targetrecord' : [],'Measuring' : 0, 'ON' : 0,'Integral' : 0.0,'Integral2' : 0.0,'device' : 'LASER650'},
-   'OD0' : {'target' : 0.0,'raw' : 0.0,'max' : 100000.0,'min': 0.0,'LASERb' : 1.833 ,'LASERa' : 0.226, 'LEDFa' : 0.673, 'LEDAa' : 7.0  },
+   # LASERa/LASERb: calibración Cary 60 OD600, 2026-10-13 (calibracion/calibracion_od.py). Original Chi.Bio: 0.226 / 1.833
+   # LASERa debe ser > 0: CalibrateOD divide por a y toma la raíz positiva.
+   'OD0' : {'target' : 0.0,'raw' : 0.0,'max' : 100000.0,'min': 0.0,'LASERb' : 0.8580 ,'LASERa' : 0.0031, 'LEDFa' : 0.673, 'LEDAa' : 7.0  },
    'Chemostat' : {'ON' : 0, 'p1' : 0.0, 'p2' : 0.1},
    'Zigzag': {'ON' : 0, 'Zig' : 0.04,'target' : 0.0,'SwitchPoint' : 0},
    'GrowthRate': {'current' : 0.0,'record' : [],'default' : 2.0},
