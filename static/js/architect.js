@@ -846,7 +846,7 @@ function compileFSM(nodes, M, progName) {
 
     const _MODES = ['turbidostat','chemostat','zigzag'];
     function modeLines(n) {
-        const on = n.state === 'on';
+        const on = n.state !== 'off';   // sin state el menú muestra "Activar": compilar igual que se ve
         if (n.type === 'turbidostat') return [
             `SetOutputOn(M, 'OD', ${on?1:0})`,
             `addTerminal(M, 'Turbidostato ${on?'activado':'desactivado'}')`];

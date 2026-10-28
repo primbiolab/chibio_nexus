@@ -769,7 +769,10 @@ function measureOD(){ajax('/MeasureOD/'+_selM,null);}
 function calibrateOD(){
   var raw=_numVal('#OD0Input','Raw medido'); if(raw===null) return;
   var act=_numVal('#OD0Actual','OD real'); if(act===null) return;
-  ajax('/CalibrateOD/OD0/'+_selM+'/'+raw+'/'+act,null);
+  // El OD se recalcula en el próximo ciclo; avisar ya para que no parezca que no pasó nada
+  ajax('/CalibrateOD/OD0/'+_selM+'/'+raw+'/'+act,function(){
+    spawnToast('ok','fa-solid fa-check','Calibración hecha','El valor de OD se actualizará en el próximo ciclo.',4000);
+  });
 }
 function setVolume(){
   var v=Math.min(20,Math.max(0,parseFloat($('#VolumeInput').val())||0));
