@@ -229,7 +229,7 @@ sysData = {'M0' : {
    'Chemostat' : {'ON' : 0, 'p1' : 0.0, 'p2' : 0.1},
    'Zigzag': {'ON' : 0, 'Zig' : 0.04,'target' : 0.0,'SwitchPoint' : 0},
    'GrowthRate': {'current' : 0.0,'record' : [],'default' : 2.0},
-   'Volume' : {'target' : 20.0,'max' : 30.0, 'min' : 0.1,'ON' : 0},
+   'Volume' : {'target' : 20.0,'max' : 20.0, 'min' : 0.1,'ON' : 0},
    'Pump1' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},
    'Pump2' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},
    'Pump3' :  {'target' : 0.0,'default' : 0.0,'max': 1.0, 'min' : -1.0, 'direction' : 1.0, 'ON' : 0,'record' : [], 'thread' : 0},

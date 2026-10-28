@@ -5,14 +5,14 @@
 
 const AST =[];          
 let safetyOk = false;
-let cs1 = false, cs2 = false, cs3 = false;
+let cs1 = false, cs2 = false, cs3 = false, cs4 = false;
 let needOdCalibration = false;
 let nodeCounter = 0;
 let dragFromPalette = null;   
 let dragFromCanvas  = null;   
 
 let globalPumps = { Pump1: 1.0, Pump2: 1.0, Pump3: 1.0, Pump4: 1.0 };
-let globalInitVol = 20.0; // ml — sincronizado con Volume del reactor en Nexus, máx 30ml (capacidad tubo de vidrio)
+let globalInitVol = 20.0; // ml — sincronizado con Volume del reactor en Nexus, máx 20ml (capacidad tubo de vidrio)
 let rawPythonCode = "";
 
 const META = {
@@ -65,7 +65,7 @@ function savePumpModal() {
     globalPumps.Pump2 = parseFloat(document.getElementById('p_rate2').value) || 1.0;
     globalPumps.Pump3 = parseFloat(document.getElementById('p_rate3').value) || 1.0;
     globalPumps.Pump4 = parseFloat(document.getElementById('p_rate4').value) || 1.0;
-    globalInitVol = Math.min(30, Math.max(0, parseFloat(document.getElementById('p_init_vol').value) || 0));
+    globalInitVol = Math.min(20, Math.max(0, parseFloat(document.getElementById('p_init_vol').value) || 0));
     _closeModal(document.getElementById('modal-pump'));
     if(window.parent !== window) window.parent.postMessage({ type:'setVolume', val:globalInitVol }, window.location.origin);
     refresh(); toast('Caudales y volumen inicial actualizados', 'ok');
@@ -78,9 +78,9 @@ function openCloudModal(){
 function saveCloudConfig(){
   _closeModal(document.getElementById('modal-cloud'));
 }
-function openSafety(){  cs1=false; cs2=false; cs3=false;['cs1','cs2','cs3'].forEach(id=>document.getElementById(id).classList.remove('done'));
-  ['cc1','cc2','cc3'].forEach(id=>{ document.getElementById(id).textContent=''; });
-  ['cs1','cs2','cs3'].forEach(id=>document.getElementById(id).setAttribute('aria-checked','false'));
+function openSafety(){  cs1=false; cs2=false; cs3=false; cs4=false;['cs1','cs2','cs3','cs4'].forEach(id=>document.getElementById(id).classList.remove('done'));
+  ['cc1','cc2','cc3','cc4'].forEach(id=>{ document.getElementById(id).textContent=''; });
+  ['cs1','cs2','cs3','cs4'].forEach(id=>document.getElementById(id).setAttribute('aria-checked','false'));
   
   needOdCalibration = AST.some(n =>['turbidostat','zigzag','measure_od'].includes(n.type) || (n.type==='trigger' && n.tvar==='OD'));
   document.getElementById('cs3').style.display = needOdCalibration ? 'flex' : 'none';
@@ -91,9 +91,10 @@ function openSafety(){  cs1=false; cs2=false; cs3=false;['cs1','cs2','cs3'].forE
 function toggleCS(n){
   if(n===1) { cs1=!cs1; document.getElementById('cs1').classList.toggle('done',cs1); document.getElementById('cs1').setAttribute('aria-checked',cs1); document.getElementById('cc1').innerHTML=cs1?'<i class="fa-solid fa-check"></i>':''; }
   else if(n===2) { cs2=!cs2; document.getElementById('cs2').classList.toggle('done',cs2); document.getElementById('cs2').setAttribute('aria-checked',cs2); document.getElementById('cc2').innerHTML=cs2?'<i class="fa-solid fa-check"></i>':''; }
-  else { cs3=!cs3; document.getElementById('cs3').classList.toggle('done',cs3); document.getElementById('cs3').setAttribute('aria-checked',cs3); document.getElementById('cc3').innerHTML=cs3?'<i class="fa-solid fa-check"></i>':''; }
-  
-  let valid = cs1 && cs2;
+  else if(n===3) { cs3=!cs3; document.getElementById('cs3').classList.toggle('done',cs3); document.getElementById('cs3').setAttribute('aria-checked',cs3); document.getElementById('cc3').innerHTML=cs3?'<i class="fa-solid fa-check"></i>':''; }
+  else { cs4=!cs4; document.getElementById('cs4').classList.toggle('done',cs4); document.getElementById('cs4').setAttribute('aria-checked',cs4); document.getElementById('cc4').innerHTML=cs4?'<i class="fa-solid fa-check"></i>':''; }
+
+  let valid = cs1 && cs2 && cs4;
   if(needOdCalibration) valid = valid && cs3;
   document.getElementById('safety-ok-btn').disabled = !valid;
 }
@@ -113,7 +114,7 @@ function checkSafetyRequirements() {
     const currentNeedOD = AST.some(n =>['turbidostat','zigzag','measure_od'].includes(n.type) || (n.type==='trigger' && n.tvar==='OD'));
     if (currentNeedOD && !needOdCalibration && safetyOk) {
         safetyOk = false;
-        cs1 = cs2 = cs3 = false;
+        cs1 = cs2 = cs3 = cs4 = false;
         const b = document.getElementById('safety-badge');
         b.classList.remove('ok');
         b.querySelector('span').innerHTML = '<i class="fa-solid fa-lock" style="font-size:9px;margin-right:2px"></i>Seguridad: Revocada';
@@ -670,9 +671,9 @@ function calcVol(arr){
   } return {inV,outV};
 }
 function updateVol(){
-  const {inV,outV}=calcVol(AST); const net=Math.max(0,globalInitVol+inV-outV); const pct=Math.min(100,(net/30)*100);
-  document.getElementById('vol-bar').style.width=pct+'%'; document.getElementById('vol-bar').classList.toggle('danger',net>30);
-  document.getElementById('vol-val').textContent=net.toFixed(2)+' / 30 ml'; document.getElementById('vol-val').style.color=net>30?'var(--danger)':'';
+  const {inV,outV}=calcVol(AST); const net=Math.max(0,globalInitVol+inV-outV); const pct=Math.min(100,(net/20)*100);
+  document.getElementById('vol-bar').style.width=pct+'%'; document.getElementById('vol-bar').classList.toggle('danger',net>20);
+  document.getElementById('vol-val').textContent=net.toFixed(2)+' / 20 ml'; document.getElementById('vol-val').style.color=net>20?'var(--danger)':'';
 }
 function updateCount(){
   function cnt(a){ return a.reduce((s,n)=>s+1+(n.children?cnt(n.children):0),0); }
@@ -802,7 +803,7 @@ function validate(nodes,errs,warns,M){
   }
 
   if (usesOptics && nodes === AST && !safetyOk) errs.push('<strong>[Sensores Ópticos]</strong> Confirma la Calibración "OD Zero" en el Checklist de Seguridad.');
-  const {inV,outV}=calcVol(nodes); if(inV-outV>30 && nodes===AST) errs.push('[Bombas] Volumen de entrada neto superará los 30ml de capacidad del tubo de vidrio. Inundación inminente.');
+  const {inV,outV}=calcVol(nodes); if(inV-outV>20 && nodes===AST) errs.push('[Bombas] Volumen de entrada neto superará los 20ml de capacidad del tubo de vidrio. Inundación inminente.');
 
   // ── Warning: measure_od antes del primer bloque de hardware ──
   if (nodes === AST) {
@@ -1157,7 +1158,7 @@ function importExperiment(event){
       reassignIds(cleanAst);
       cleanAst.forEach(n => AST.push(n));
       if(data.pumps) Object.assign(globalPumps, _sanitizeImportedPumps(data.pumps));
-      if(data.initialVol !== undefined) globalInitVol = Math.min(30, Math.max(0, data.initialVol));
+      if(data.initialVol !== undefined) globalInitVol = Math.min(20, Math.max(0, data.initialVol));
 
       // Restore reactor if saved (program slot is always C8)
       if(data.reactor) document.getElementById('dev-sel').value = data.reactor;
@@ -1354,7 +1355,7 @@ const TOUR_STEPS =[
     desc:'Escribe lo que quieres que haga el Biorreactor en lenguaje natural y la Inteligencia Artificial construirá los bloques automáticamente por ti.' },
   { sel:'.vol-bar-outer', pos:'top',
     title:'Volumen Estimado',
-    desc:'Lleva la cuenta del volumen neto que inyectarán las bombas a lo largo del protocolo. Si superas los 30 ml el compilador bloqueará el experimento.' },
+    desc:'Lleva la cuenta del volumen neto que inyectarán las bombas a lo largo del protocolo. Si superas los 20 ml el compilador bloqueará el experimento.' },
   { sel: null, pos:'top-bar', parentSel:'#arch-caudales-btn',
     title:'Caudales de Bombas',
     desc:'Abre la configuración de caudales globales para las 4 bombas peristálticas. Aquí defines cuántos ml por minuto entrega cada bomba.' },
@@ -1712,7 +1713,7 @@ window.addEventListener('message', function(e){
       case 'export':         exportExperiment(); break;
       case 'tour':           startTour(); break;
       case 'setVolume':
-        globalInitVol = Math.min(30, Math.max(0, parseFloat(e.data.val) || 0));
+        globalInitVol = Math.min(20, Math.max(0, parseFloat(e.data.val) || 0));
         var _pInit = document.getElementById('p_init_vol');
         if(_pInit) _pInit.value = globalInitVol;
         updateVol();
@@ -1726,7 +1727,7 @@ window.addEventListener('message', function(e){
           reassignIds(cleanAst);
           cleanAst.forEach(n => AST.push(n));
           if(data.pumps) Object.assign(globalPumps, _sanitizeImportedPumps(data.pumps));
-          if(data.initialVol !== undefined) globalInitVol = Math.min(30, Math.max(0, data.initialVol));
+          if(data.initialVol !== undefined) globalInitVol = Math.min(20, Math.max(0, data.initialVol));
           if(data.reactor) { document.getElementById('dev-sel').value = data.reactor; document.getElementById('dev-badge').textContent = data.reactor; }
           refresh();
           toast(`Experimento cargado — ${AST.length} bloques ✓`, 'ok');

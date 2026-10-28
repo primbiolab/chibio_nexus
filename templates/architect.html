@@ -269,6 +269,10 @@
       <div class="ccheck" id="cc3"></div>
       <div class="cstep-txt"><strong>Calibración Óptica (OD Zero)</strong><br>Se ha realizado la calibración del sensor con medio limpio en la interfaz web original.</div>
     </div>
+    <div class="cstep" id="cs4" onclick="toggleCS(4)" role="checkbox" aria-checked="false" tabindex="0">
+      <div class="ccheck" id="cc4"></div>
+      <div class="cstep-txt"><strong>Mangueras cebadas</strong><br>Las mangueras (al menos la de medio) están llenas de líquido, para que la bomba gotee de inmediato al activarse.</div>
+    </div>
     <div class="mfooter">
       <button class="btn btn-ghost" onclick="closeSafetyBtn(false)">Cancelar</button>
       <button class="btn btn-accent" id="safety-ok-btn" onclick="closeSafetyBtn(true)" disabled>
@@ -291,7 +295,7 @@
       <div class="frow"><label class="flbl" for="p_rate3">Bomba 3 (auxiliar) — ml/min</label><input type="number" id="p_rate3" class="finp" min="0" step="0.1" value="1.0"></div>
       <div class="frow"><label class="flbl" for="p_rate4">Bomba 4 (auxiliar) — ml/min</label><input type="number" id="p_rate4" class="finp" min="0" step="0.1" value="1.0"></div>
       <hr style="border:none;border-top:1px solid var(--border);margin:6px 0">
-      <div class="frow"><label class="flbl" for="p_init_vol">Volumen inicial en reactor — ml</label><input type="number" id="p_init_vol" class="finp" min="0" max="30" step="0.5" value="20.0"></div>
+      <div class="frow"><label class="flbl" for="p_init_vol">Volumen inicial en reactor — ml</label><input type="number" id="p_init_vol" class="finp" min="0" max="20" step="0.5" value="20.0"></div>
     </div>
     <p class="fnote" style="margin-top:8px">El volumen inicial previene estimaciones de desbordamiento cuando el reactor ya tiene líquido al comenzar el protocolo.</p>
     <div class="mfooter">
