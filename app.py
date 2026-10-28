@@ -1294,10 +1294,7 @@ def PumpModulation(M,item):
     Time1=datetime.now()
     cycletime=sysData[M]['Experiment']['cycleTime']*1.05 #Marginally longer than experiment cycle time.
 
-    PUMP_MIN_ONTIME = 0.6  # segundos mínimos para que el motor desplace fluido realmente
     Ontime=cycletime*abs(sysData[M][item]['target'])
-    if 0 < Ontime < PUMP_MIN_ONTIME:
-        Ontime = 0.0  # Pulso demasiado corto: omitir; integrador acumula en el próximo ciclo
 
     if (Ontime > 0 and sysData[M][item]['target']>0): #Forward direction
         _pump_write(M,item,currentThread,1.0*float(sysData[M][item]['ON']),0.0)
